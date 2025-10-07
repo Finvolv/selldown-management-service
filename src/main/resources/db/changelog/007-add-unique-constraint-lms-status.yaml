@@ -1,0 +1,9 @@
+databaseChangeLog:
+  - changeSet:
+      id: 007-add-unique-constraint-lms-status
+      author: system
+      changes:
+        - addUniqueConstraint:
+            tableName: "sd-monthly_lms_status"
+            constraintName: uk_monthly_lms_status_year_month
+            columnNames: year, month

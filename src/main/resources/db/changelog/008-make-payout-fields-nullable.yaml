@@ -1,0 +1,239 @@
+databaseChangeLog:
+  - changeSet:
+      id: 008-make-payout-fields-nullable
+      author: system
+      changes:
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: opening_pos
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: closing_pos
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: total_principal_due
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: principal_overdue
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: total_principal_component_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: principal_overdue_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: total_interest_due
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: interest_overdue
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: total_interest_component_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: interest_overdue_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: foreclosure_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: foreclosure_charges_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: prepayment_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: prepayment_charges_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: total_charges_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: total_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: opening_dpd
+            newDataType: INTEGER
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: closing_dpd
+            newDataType: INTEGER
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_opening_pos
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_closing_pos
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_total_principal_due
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_principal_overdue
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_total_principal_component_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_principal_overdue_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_total_interest_due
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_interest_overdue
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_total_interest_component_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_interest_overdue_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_foreclosure_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_foreclosure_charges_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_prepayment_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_prepayment_charges_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_total_charges_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_total_paid
+            newDataType: NUMERIC(20,2)
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_opening_dpd
+            newDataType: INTEGER
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: seller_closing_dpd
+            newDataType: INTEGER
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: lms_id
+            newDataType: BIGINT
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: deal_status_id
+            newDataType: BIGINT
+            constraints:
+              nullable: true
+        - modifyDataType:
+            tableName: "sd-partner_payout_details_all"
+            columnName: lms_lan
+            newDataType: VARCHAR(50)
+            constraints:
+              nullable: true

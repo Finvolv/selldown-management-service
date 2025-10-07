@@ -1,0 +1,20 @@
+databaseChangeLog:
+  - changeSet:
+      id: 009-add-opening-pos-mismatch-flag
+      author: system
+      changes:
+        - addColumn:
+            tableName: "sd-partner_payout_details_all"
+            columns:
+              - column:
+                  name: is_opening_pos_mismatch
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: "sd-partner_payout_details_all"
+                columnName: "is_opening_pos_mismatch"

@@ -1,0 +1,272 @@
+databaseChangeLog:
+  - changeSet:
+      id: 004-create-partner-payout-details-table
+      author: system
+      changes:
+        - createSequence:
+            sequenceName: sd_partner_payout_details_all_id_seq
+            startValue: 1
+            incrementBy: 1
+        - createTable:
+            tableName: "sd-partner_payout_details_all"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  defaultValueComputed: "nextval('sd_partner_payout_details_all_id_seq')"
+              - column:
+                  name: lms_lan
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: opening_pos
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: closing_pos
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_principal_due
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: principal_overdue
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_principal_component_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: principal_overdue_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_interest_due
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: interest_overdue
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_interest_component_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: interest_overdue_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: foreclosure_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: foreclosure_charges_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prepayment_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: prepayment_charges_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_charges_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: total_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: opening_dpd
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: closing_dpd
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_opening_pos
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_closing_pos
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_total_principal_due
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_principal_overdue
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_total_principal_component_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_principal_overdue_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_total_interest_due
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_interest_overdue
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_total_interest_component_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_interest_overdue_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_foreclosure_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_foreclosure_charges_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_prepayment_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_prepayment_charges_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_total_charges_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_total_paid
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_opening_dpd
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: seller_closing_dpd
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deal_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: partner_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: deal_status_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cycle_start_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: cycle_end_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: last_cycle_end_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: "sd-partner_payout_details_all"
+            baseColumnNames: deal_id
+            constraintName: fk_payout_details_deal
+            referencedTableName: "sd-deal"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: "sd-partner_payout_details_all"
+            baseColumnNames: partner_id
+            constraintName: fk_payout_details_partner
+            referencedTableName: "sd-customer"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: "sd-partner_payout_details_all"
+            indexName: idx_payout_details_deal_partner
+            columns:
+              - column:
+                  name: deal_id
+              - column:
+                  name: partner_id
+        - createIndex:
+            tableName: "sd-partner_payout_details_all"
+            indexName: idx_payout_details_lms_lan
+            columns:
+              - column:
+                  name: lms_lan

@@ -1,0 +1,54 @@
+databaseChangeLog:
+  - changeSet:
+      id: 006-update-partner-payout-details-table
+      author: system
+      changes:
+        - dropForeignKeyConstraint:
+            baseTableName: "sd-partner_payout_details_all"
+            constraintName: fk_payout_details_deal
+        - dropForeignKeyConstraint:
+            baseTableName: "sd-partner_payout_details_all"
+            constraintName: fk_payout_details_partner
+        - dropIndex:
+            tableName: "sd-partner_payout_details_all"
+            indexName: idx_payout_details_deal_partner
+        - dropColumn:
+            tableName: "sd-partner_payout_details_all"
+            columnName: deal_id
+        - dropColumn:
+            tableName: "sd-partner_payout_details_all"
+            columnName: partner_id
+        - addColumn:
+            tableName: "sd-partner_payout_details_all"
+            columns:
+              - column:
+                  name: lms_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: "sd-partner_payout_details_all"
+            baseColumnNames: lms_id
+            constraintName: fk_payout_details_lms_status
+            referencedTableName: "sd-monthly_lms_status"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: "sd-partner_payout_details_all"
+            baseColumnNames: deal_status_id
+            constraintName: fk_payout_details_deal_status
+            referencedTableName: "sd-monthly_processing_status"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: "sd-partner_payout_details_all"
+            indexName: idx_payout_details_lms_id
+            columns:
+              - column:
+                  name: lms_id
+        - createIndex:
+            tableName: "sd-partner_payout_details_all"
+            indexName: idx_payout_details_deal_status_id
+            columns:
+              - column:
+                  name: deal_status_id

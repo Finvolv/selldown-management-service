@@ -1,0 +1,114 @@
+databaseChangeLog:
+  - changeSet:
+      id: 005-create-monthly-processing-status-table
+      author: system
+      changes:
+        - createSequence:
+            sequenceName: sd_monthly_processing_status_id_seq
+            startValue: 1
+            incrementBy: 1
+        - createTable:
+            tableName: "sd-monthly_processing_status"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  defaultValueComputed: "nextval('sd_monthly_processing_status_id_seq')"
+              - column:
+                  name: deal_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: partner_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: year
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: month
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cycle_start_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: cycle_end_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: "sd-monthly_processing_status"
+            baseColumnNames: deal_id
+            constraintName: fk_monthly_status_deal
+            referencedTableName: "sd-deal"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: "sd-monthly_processing_status"
+            baseColumnNames: partner_id
+            constraintName: fk_monthly_status_partner
+            referencedTableName: "sd-customer"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: "sd-monthly_processing_status"
+            indexName: idx_monthly_status_deal_partner_year_month
+            columns:
+              - column:
+                  name: deal_id
+              - column:
+                  name: partner_id
+              - column:
+                  name: year
+              - column:
+                  name: month
+        - createIndex:
+            tableName: "sd-monthly_processing_status"
+            indexName: idx_monthly_status_year_month
+            columns:
+              - column:
+                  name: year
+              - column:
+                  name: month
+        - createIndex:
+            tableName: "sd-monthly_processing_status"
+            indexName: idx_monthly_status_partner_year_month
+            columns:
+              - column:
+                  name: partner_id
+              - column:
+                  name: year
+              - column:
+                  name: month
+        - createIndex:
+            tableName: "sd-monthly_processing_status"
+            indexName: idx_monthly_status_status
+            columns:
+              - column:
+                  name: status

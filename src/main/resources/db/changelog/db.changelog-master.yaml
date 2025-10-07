@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - include:
+      file: classpath:db/changelog/001-add-selldown-table-for-customer-deal-interest-rate-change.yaml
+  - include:
+      file: classpath:db/changelog/002-create-loan-details.yaml
+  - include:
+      file: classpath:db/changelog/003-partner-payout-details-all-deals.yaml
+  - include:
+      file: classpath:db/changelog/004-monthly-processing-status.yaml
+  - include:
+      file: classpath:db/changelog/005-monthly-lms-status.yaml
+  - include:
+      file: classpath:db/changelog/006-update-partner-payout-details.yaml
+  - include:
+      file: classpath:db/changelog/007-add-unique-constraint-lms-status.yaml
+  - include:
+      file: classpath:db/changelog/008-make-payout-fields-nullable.yaml
+  - include:
+      file: classpath:db/changelog/009-add-opening-pos-mismatch-flag.yaml
+
+

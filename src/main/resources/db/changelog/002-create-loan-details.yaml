@@ -1,0 +1,120 @@
+databaseChangeLog:
+  - changeSet:
+      id: 003-01-create-sd-loan-details
+      author: deepak
+      changes:
+        - createSequence:
+            sequenceName: sd_loan_details_id_seq
+            startValue: 1
+            incrementBy: 1
+        - createTable:
+            tableName: "sd-loan_details"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  defaultValueComputed: "nextval('sd_loan_details_id_seq')"
+              - column:
+                  name: deal_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: partner_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lms_lan
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_pos
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_assigned_pos
+                  type: NUMERIC(20,2)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: current_interest_rate
+                  type: NUMERIC(11,6)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: assigned_interest_rate_override
+                  type: NUMERIC(11,6)
+              - column:
+                  name: current_assigned_overdue_interest
+                  type: NUMERIC(20,2)
+              - column:
+                  name: current_dpd
+                  type: INTEGER
+                  defaultValue: "0"
+              - column:
+                  name: status
+                  type: VARCHAR(20)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: last_cycle_end_date
+                  type: DATE
+              - column:
+                  name: loan_type
+                  type: VARCHAR(20)
+              - column:
+                  name: loan_started_date
+                  type: VARCHAR(50)
+              - column:
+                  name: loan_age
+                  type: INTEGER
+                  defaultValue: "0"
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: "sd-loan_details"
+            baseColumnNames: deal_id
+            referencedTableName: "sd-deal"
+            referencedColumnNames: id
+            constraintName: fk_sd_loan_details_deal
+            onDelete: CASCADE
+        - addForeignKeyConstraint:
+            baseTableName: "sd-loan_details"
+            baseColumnNames: partner_id
+            referencedTableName: "sd-customer"
+            referencedColumnNames: id
+            constraintName: fk_sd_loan_details_partner
+            onDelete: CASCADE
+        - createIndex:
+            indexName: idx_loan_details_deal_partner
+            tableName: "sd-loan_details"
+            columns:
+              - column:
+                  name: deal_id
+              - column:
+                  name: partner_id
+        - createIndex:
+            indexName: idx_loan_details_lms_lan_unique
+            tableName: "sd-loan_details"
+            unique: true
+            columns:
+              - column:
+                  name: partner_id
+              - column:
+                  name: deal_id
+              - column:
+                  name: lms_lan

@@ -1,0 +1,51 @@
+server:
+  port: 8090
+
+spring:
+  webflux.base-path: "/selldown-management-service"
+  application:
+    name: selldown-management-service
+
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/merge_excel_9
+    username: postgres
+    password: postgres
+
+  liquibase:
+    change-log: classpath:db/changelog/db.changelog-master.yaml
+    url: jdbc:postgresql://localhost:5432/merge_excel_9
+    user: postgres
+    password: postgres
+    driver-class-name: org.postgresql.Driver
+
+documentService:
+  baseUrl: ${DOCUMENT_SERVICE_BASE_URL:http://localhost:8082}
+
+logging:
+  level:
+    root: INFO
+
+iam:
+  host: ${IAM_HOST:http://35.154.124.17:8642/}
+  client-id: ${IAM_CLIENT_ID:lending}
+  client-secret: ${IAM_CLIENT_SECRET:sdjfutF2wBcEPniiMXTkzgqIltYs0TPU}
+  realm: ${IAM_REALM:master}
+  admin-username: ${IAM_ADMIN_USERNAME:abfl@kuliza.com}
+  admin-email: ${IAM_ADMIN_EMAIL:abfl@kuliza.com}
+  admin-password: ${IAM_ADMIN_PASSWORD:admin}
+  auth-endpoint: ${IAM_AUTH_ENDPOINT:auth}
+  realm-endpoint: ${IAM_REALM_ENDPOINT:'auth/'}
+  offline-sessions: ${IAM_OFFLINE_SESSION:1}
+  active-sessions: ${IAM_ACTIVE_SESSION:300}
+  otp-expiry: ${IAM_OTP_EXPIRY:43200}
+  mfa-enabled: ${IAM_MFA_ENABLED:false}
+
+user:
+  data:
+    admin:
+      username: ${USER_DATA_ADMIN_USERNAME:admin@uam.com}
+      emailId: ${USER_DATA_ADMIN_EMAIL_ID:admin@uam.com}
+      password: ${USER_DATA_ADMIN_PASSWORD:admin}
+      mobileNumber: ${USER_DATA_ADMIN_MOBILE_NUMBER:admin@uam.com}
+
+
