@@ -66,6 +66,7 @@ public class DealController {
                                         .updatedBy(deal.getUpdatedBy())
                                         .updatedAt(deal.getUpdatedAt())
                                         .interestRateTable(interestRateChanges)
+                                        .monthOnMonthDay(deal.getMonthOnMonthDay())
                                         .build())
                 );
     }
@@ -85,7 +86,7 @@ public class DealController {
     }
 
     // Change interest rate
-    @PostMapping("/update")
+    @PostMapping("/interest-rate/update")
     public Mono<InterestRateChange> changeInterestRate(@RequestBody InterestRateChange interestRateChange) {
         Long dealId = interestRateChange.getDealId();
         Double interestRate = interestRateChange.getInterestRate();
@@ -93,6 +94,7 @@ public class DealController {
         LocalDate endDate = interestRateChange.getEndDate();
         return interestRateChangeService.changeInterestRate(dealId, interestRate, startDate, endDate);
     }
+
 
     // Exception Handler
     @ResponseStatus(HttpStatus.NOT_FOUND)

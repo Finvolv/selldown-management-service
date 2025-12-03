@@ -2,8 +2,10 @@ package com.finvolv.selldown.service;
 
 import com.finvolv.selldown.model.Deal;
 import com.finvolv.selldown.model.Customer;
+import com.finvolv.selldown.model.InterestRateChange;
 import com.finvolv.selldown.repository.DealRepository;
 import com.finvolv.selldown.repository.CustomerRepository;
+import com.finvolv.selldown.repository.InterestRateChangeRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -21,11 +23,15 @@ public class DealService {
     @Autowired
     private CustomerRepository customerRepository;
 
+    @Autowired
+    private InterestRateChangeRepository interestRateChangeRepository;
+
     public Mono<Deal> getDealById(Long id) {
         return dealRepository.findById(id);
     }
 
     public Mono<Deal> createDeal(Deal deal, String createdBy) {
+        // Validate dealType is provided
         if (deal.getDealType() == null) {
             return Mono.error(new IllegalArgumentException("Deal type must be specified"));
         }
@@ -35,7 +41,18 @@ public class DealService {
         deal.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
         deal.setUpdatedBy(createdBy);
         return checkCustomerExists(deal.getCustomerId())
-                .then(dealRepository.save(deal));
+                .then(dealRepository.save(deal))
+                .flatMap(savedDeal -> {
+                    // Create an entry in Interest Rate Change table
+                    InterestRateChange interestRateChange = InterestRateChange.builder()
+                            .dealId(savedDeal.getId())
+                            .startDate(savedDeal.getStartDate())
+                            .interestRate(savedDeal.getAnnualInterestRate())
+                            .endDate(null)
+                            .build();
+                    return interestRateChangeRepository.save(interestRateChange)
+                            .thenReturn(savedDeal);
+                });
     }
 
     public Mono<Void> deleteDeal(Long id) {

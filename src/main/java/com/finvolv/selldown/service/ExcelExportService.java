@@ -205,44 +205,43 @@ public class ExcelExportService {
         });
         
         cols.put("Opening POS without overdues", p -> safeSubtract(p.getOpeningPos(), p.getPrincipalOverdue()));
-        cols.put("Closing Future POS (excluding Principal overdues)", PartnerPayoutDetailsAll::getClosingPos);
-        cols.put("Principal due", PartnerPayoutDetailsAll::getTotalPrincipalDue);
         cols.put("Opening Principal Overdues", PartnerPayoutDetailsAll::getPrincipalOverdue);
+        cols.put("Opening Interest Overdues", PartnerPayoutDetailsAll::getInterestOverdue);
         cols.put("Opening Total Overdues", p -> safeAdd(p.getPrincipalOverdue(), p.getInterestOverdue()));
         cols.put("Opening Future POS including overdues 100%", PartnerPayoutDetailsAll::getOpeningPos);
         cols.put("EMI Due", p -> safeAdd(
                 safeSubtract(p.getTotalPrincipalDue(), p.getPrincipalOverdue()),
                 safeSubtract(p.getTotalInterestDue(), p.getInterestOverdue())));
+        cols.put("Principal due",  p -> safeSubtract(p.getTotalPrincipalDue(), p.getPrincipalOverdue())); //Todo Check
+        cols.put("Interest Due", PartnerPayoutDetailsAll::getTotalInterestDue); //TOdo
         cols.put("Collection against current Principal", p -> safeSubtract(p.getTotalPrincipalComponentPaid(), p.getPrincipalOverduePaid()));
         cols.put("Collection against current Interest", p -> safeSubtract(p.getTotalInterestComponentPaid(), p.getInterestOverduePaid()));
+        cols.put("Collection against overdue Principal", PartnerPayoutDetailsAll::getPrincipalOverduePaid);
+        cols.put("Collection against overdue Interest", PartnerPayoutDetailsAll::getInterestOverduePaid);
+        cols.put("Part Payment", p -> safeAdd(p.getForeclosurePaid(),p.getPrepaymentPaid())); //Todo Plus foreclurePaid
         cols.put(" Closing Principal overdue", p -> safeSubtract(p.getTotalPrincipalDue(), p.getTotalPrincipalComponentPaid()));
         cols.put("Closing Intrest overdue", p -> safeSubtract(p.getTotalInterestDue(), p.getTotalInterestComponentPaid()));
         cols.put("Closing Total Overdues", p -> safeAdd(
                 safeSubtract(p.getTotalPrincipalDue(), p.getTotalPrincipalComponentPaid()),
                 safeSubtract(p.getTotalInterestDue(), p.getTotalInterestComponentPaid())));
-        cols.put(" Closing Future POS (excluding Principal overdues)", p -> safeSubtract(p.getClosingPos(),
-                safeSubtract(p.getTotalPrincipalDue(), p.getTotalPrincipalComponentPaid())));
-
-        cols.put("Collection against overdue Principal", PartnerPayoutDetailsAll::getPrincipalOverduePaid);
-        cols.put("Interest Due", PartnerPayoutDetailsAll::getTotalInterestDue);
-        cols.put("Opening Interest Overdues", PartnerPayoutDetailsAll::getInterestOverdue);
-        cols.put("Collection against overdue Interest", PartnerPayoutDetailsAll::getInterestOverduePaid);
-        cols.put("Part Payment", PartnerPayoutDetailsAll::getPrepaymentPaid);
         cols.put("Foreclosure charges received (Exc of GST)", PartnerPayoutDetailsAll::getForeclosureChargesPaid);
-        cols.put("Bounce charges received (Exc of GST)", p -> "");
-        cols.put("Total Collections (EMI+Overdue+Part+F.C)", PartnerPayoutDetailsAll::getTotalPaid);
+        cols.put("Bounce charges received (Exc of GST)", p -> safeSubtract(p.getTotalChargesPaid(), p.getForeclosureChargesPaid()));
         cols.put("Closing DPD", PartnerPayoutDetailsAll::getClosingDpd);
+        cols.put("Total Collections (EMI+Overdue+Part+F.C)", PartnerPayoutDetailsAll::getTotalPaid);
+        cols.put("Closing Future POS (excluding Principal overdues)", PartnerPayoutDetailsAll::getClosingPos); //ToDo Check
 
-        // Seller
-        cols.put("Opening POS ( Without overdue) Sell down", p -> safeSubtract(p.getSellerOpeningPos(), p.getPrincipalOverdue()));
-        cols.put("Closing Future POS (excluding Principal overdues).", PartnerPayoutDetailsAll::getSellerClosingPos);
-        cols.put("Principal", PartnerPayoutDetailsAll::getSellerTotalPrincipalDue);
+        // Seller Fields
+        cols.put("Opening POS ( Without overdue) Sell down", p -> safeSubtract(p.getSellerOpeningPos(), p.getSellerPrincipalOverdue()));
+        cols.put("Principal", p -> safeSubtract(p.getSellerTotalPrincipalComponentPaid(), p.getSellerPrincipalOverduePaid()));
+        cols.put("Interest", p -> safeSubtract(p.getSellerTotalInterestDue(), p.getSellerInterestOverdue()));
         cols.put("Principal O/d collection", PartnerPayoutDetailsAll::getSellerPrincipalOverduePaid);
-        cols.put("Interest", PartnerPayoutDetailsAll::getSellerTotalInterestDue);
-        cols.put("Overdue Interest  collection", PartnerPayoutDetailsAll::getSellerInterestOverduePaid);
-        cols.put("Pre Payment", PartnerPayoutDetailsAll::getSellerPrepaymentPaid);
+        cols.put("Overdue Interest  collection", PartnerPayoutDetailsAll::getSellerInterestOverduePaid); //ToDO
+        cols.put("Pre Payment",p -> safeAdd(p.getSellerForeclosurePaid(),p.getSellerPrepaymentPaid()));
+        cols.put("Bounce Charges", p -> safeSubtract(p.getSellerTotalChargesPaid(), p.getSellerForeclosureChargesPaid()));
         cols.put("FC Charges", PartnerPayoutDetailsAll::getSellerForeclosureChargesPaid);
+        cols.put("Closing Future POS (excluding Principal overdues).",  p -> safeSubtract(p.getSellerClosingPos(), safeSubtract(p.getSellerTotalPrincipalDue(),p.getSellerTotalPrincipalComponentPaid())));
         cols.put("Total Collections (EMI+Overdue+Part+F.C).", PartnerPayoutDetailsAll::getSellerTotalPaid);
+        // Closing Overdue Interest Need to find logic
 
         return cols;
     }

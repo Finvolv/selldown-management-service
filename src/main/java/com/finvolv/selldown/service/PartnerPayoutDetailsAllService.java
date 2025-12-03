@@ -36,14 +36,14 @@ public class PartnerPayoutDetailsAllService {
     private final DealRepository dealRepository;
     
     @Transactional
-    private Flux<PartnerPayoutDetailsAll> saveAllPayoutDetails(List<PartnerPayoutDetailsAll> payoutDetails) {
-        logger.debug("Saving {} payout details in batch", payoutDetails.size());
+    private Flux<PartnerPayoutDetailsAll> saveAllPayoutDetails(List<PartnerPayoutDetailsAll> payoutDetails, Long lmsId) {
+        logger.debug("Saving {} payout details in batch for lmsId: {}", payoutDetails.size(), lmsId);
         
-        // Set lastCycleEndDate for each payout detail based on previous entry for same LMS LAN
+        // Process each payout detail: check if exists, update or create
         return Flux.fromIterable(payoutDetails)
             .flatMap(payout -> {
-                // Find the latest previous entry for this LMS LAN
-                return partnerPayoutDetailsAllRepository.findByLmsLan(payout.getLmsLan())
+                // First, set lastCycleEndDate for each payout detail based on previous entry for same LMS LAN
+                Mono<PartnerPayoutDetailsAll> payoutWithLastCycleDate = partnerPayoutDetailsAllRepository.findByLmsLan(payout.getLmsLan())
                     .sort((a, b) -> b.getCreatedAt().compareTo(a.getCreatedAt())) // Sort by created_at desc
                     .next() // Get the latest one
                     .map(latestEntry -> {
@@ -57,9 +57,107 @@ public class PartnerPayoutDetailsAllService {
                         p.setLastCycleEndDate(null);
                         logger.debug("No previous entry found for {}, set lastCycleEndDate to null", p.getLmsLan());
                     }));
+                
+                // Check if entry already exists for this lmsId and lmsLan
+                return payoutWithLastCycleDate
+                    .flatMap(p -> {
+                        // Use Flux to handle multiple results (duplicates)
+                        return partnerPayoutDetailsAllRepository.findAllByLmsIdAndLmsLan(lmsId, p.getLmsLan())
+                            .collectList()
+                            .flatMap(existingList -> {
+                                if (!existingList.isEmpty()) {
+                                    // Entry exists - take the first one (latest by id DESC) and update it
+                                    // Also delete any duplicates
+                                    PartnerPayoutDetailsAll existing = existingList.get(0);
+                                    logger.debug("Found existing entry for lmsId: {}, lmsLan: {} (found {} duplicate(s))", 
+                                        lmsId, p.getLmsLan(), existingList.size());
+                                    
+                                    // If there are duplicates, delete them (keep only the first one)
+                                    Mono<PartnerPayoutDetailsAll> existingMono;
+                                    if (existingList.size() > 1) {
+                                        logger.warn("Found {} duplicate entries for lmsId: {}, lmsLan: {}. Deleting duplicates.", 
+                                            existingList.size(), lmsId, p.getLmsLan());
+                                        
+                                        // Delete duplicates (all except the first one)
+                                        List<Long> duplicateIds = existingList.stream()
+                                            .skip(1)
+                                            .map(PartnerPayoutDetailsAll::getId)
+                                            .toList();
+                                        
+                                        existingMono = Flux.fromIterable(duplicateIds)
+                                            .flatMap(partnerPayoutDetailsAllRepository::deleteById)
+                                            .then(Mono.just(existing));
+                                    } else {
+                                        existingMono = Mono.just(existing);
+                                    }
+                                    
+                                    // Update all fields on the existing entry
+                                    return existingMono.map(entityToUpdate -> {
+                                        // Copy all fields from new payout to existing, preserving the ID and createdAt
+                                        entityToUpdate.setLmsId(p.getLmsId());
+                                        entityToUpdate.setLmsLan(p.getLmsLan());
+                                        entityToUpdate.setOpeningPos(p.getOpeningPos());
+                                        entityToUpdate.setClosingPos(p.getClosingPos());
+                                        entityToUpdate.setTotalPrincipalDue(p.getTotalPrincipalDue());
+                                        entityToUpdate.setPrincipalOverdue(p.getPrincipalOverdue());
+                                        entityToUpdate.setTotalPrincipalComponentPaid(p.getTotalPrincipalComponentPaid());
+                                        entityToUpdate.setPrincipalOverduePaid(p.getPrincipalOverduePaid());
+                                        entityToUpdate.setTotalInterestDue(p.getTotalInterestDue());
+                                        entityToUpdate.setInterestOverdue(p.getInterestOverdue());
+                                        entityToUpdate.setTotalInterestComponentPaid(p.getTotalInterestComponentPaid());
+                                        entityToUpdate.setInterestOverduePaid(p.getInterestOverduePaid());
+                                        entityToUpdate.setForeclosurePaid(p.getForeclosurePaid());
+                                        entityToUpdate.setForeclosureChargesPaid(p.getForeclosureChargesPaid());
+                                        entityToUpdate.setPrepaymentPaid(p.getPrepaymentPaid());
+                                        entityToUpdate.setPrepaymentChargesPaid(p.getPrepaymentChargesPaid());
+                                        entityToUpdate.setTotalChargesPaid(p.getTotalChargesPaid());
+                                        entityToUpdate.setTotalPaid(p.getTotalPaid());
+                                        entityToUpdate.setOpeningDpd(p.getOpeningDpd());
+                                        entityToUpdate.setClosingDpd(p.getClosingDpd());
+                                        entityToUpdate.setSellerOpeningPos(p.getSellerOpeningPos());
+                                        entityToUpdate.setSellerClosingPos(p.getSellerClosingPos());
+                                        entityToUpdate.setSellerTotalPrincipalDue(p.getSellerTotalPrincipalDue());
+                                        entityToUpdate.setSellerPrincipalOverdue(p.getSellerPrincipalOverdue());
+                                        entityToUpdate.setSellerTotalPrincipalComponentPaid(p.getSellerTotalPrincipalComponentPaid());
+                                        entityToUpdate.setSellerPrincipalOverduePaid(p.getSellerPrincipalOverduePaid());
+                                        entityToUpdate.setSellerTotalInterestDue(p.getSellerTotalInterestDue());
+                                        entityToUpdate.setSellerInterestOverdue(p.getSellerInterestOverdue());
+                                        entityToUpdate.setSellerTotalInterestComponentPaid(p.getSellerTotalInterestComponentPaid());
+                                        entityToUpdate.setSellerInterestOverduePaid(p.getSellerInterestOverduePaid());
+                                        entityToUpdate.setSellerForeclosurePaid(p.getSellerForeclosurePaid());
+                                        entityToUpdate.setSellerForeclosureChargesPaid(p.getSellerForeclosureChargesPaid());
+                                        entityToUpdate.setSellerPrepaymentPaid(p.getSellerPrepaymentPaid());
+                                        entityToUpdate.setSellerPrepaymentChargesPaid(p.getSellerPrepaymentChargesPaid());
+                                        entityToUpdate.setSellerTotalChargesPaid(p.getSellerTotalChargesPaid());
+                                        entityToUpdate.setSellerTotalPaid(p.getSellerTotalPaid());
+                                        entityToUpdate.setSellerOpeningDpd(p.getSellerOpeningDpd());
+                                        entityToUpdate.setSellerClosingDpd(p.getSellerClosingDpd());
+                                        entityToUpdate.setDealStatusId(p.getDealStatusId());
+                                        entityToUpdate.setCycleStartDate(p.getCycleStartDate());
+                                        entityToUpdate.setCycleEndDate(p.getCycleEndDate());
+                                        entityToUpdate.setLastCycleEndDate(p.getLastCycleEndDate());
+                                        
+                                        // Ensure isOpeningPosMisMatch is never null (use value from p, or default to false)
+                                        Boolean isOpeningPosMisMatch = p.getIsOpeningPosMisMatch();
+                                        if (isOpeningPosMisMatch == null) {
+                                            isOpeningPosMisMatch = false;
+                                        }
+                                        entityToUpdate.setIsOpeningPosMisMatch(isOpeningPosMisMatch);
+                                        
+                                        // Update modified timestamp, but preserve created timestamp
+                                        entityToUpdate.setModifiedAt(LocalDateTime.now());
+                                        
+                                        return entityToUpdate;
+                                    });
+                                } else {
+                                    // Entry doesn't exist - create new one
+                                    logger.debug("Creating new entry for lmsId: {}, lmsLan: {}", lmsId, p.getLmsLan());
+                                    return Mono.just(p);
+                                }
+                            });
+                    });
             })
-            .collectList()
-            .flatMapMany(updatedPayouts -> partnerPayoutDetailsAllRepository.saveAll(updatedPayouts));
+            .flatMap(partnerPayoutDetailsAllRepository::save);
     }
     
     public Flux<PartnerPayoutDetailsAll> uploadLMSFile(Integer year, Integer month, List<PartnerPayoutDetailsAll> payoutDetails) {
@@ -87,12 +185,17 @@ public class PartnerPayoutDetailsAllService {
                                 LocalDate.of(year, month, 1).lengthOfMonth()));
                         }
                         
+                        // Ensure isOpeningPosMisMatch is never null (default to false)
+                        if (payout.getIsOpeningPosMisMatch() == null) {
+                            payout.setIsOpeningPosMisMatch(false);
+                        }
+                        
                         return payout;
                     })
                     .toList();
                 
-                // Save all payout details in a single transaction
-                return saveAllPayoutDetails(preparedPayoutDetails)
+                // Save all payout details in a single transaction (update if exists, create if not)
+                return saveAllPayoutDetails(preparedPayoutDetails, lmsStatusId)
                     .doOnComplete(() -> 
                         logger.info("Successfully uploaded LMS file - year: {}, month: {}, records: {}", 
                             year, month, payoutDetails.size()))
@@ -223,7 +326,8 @@ public class PartnerPayoutDetailsAllService {
         payoutDetail.setSellerPrepaymentChargesPaid(calculateValue(payoutDetail.getPrepaymentChargesPaid(), assignRatio));
         payoutDetail.setSellerTotalChargesPaid(calculateValue(payoutDetail.getTotalChargesPaid(), assignRatio));
         payoutDetail.setSellerTotalPaid(calculateValue(payoutDetail.getTotalPaid(), assignRatio));
-
+logger.info("annualInterestRate: {}", annualInterestRate);
+logger.info("daysBetween: {}", daysBetween);
         // Calculate interest based on seller opening position, interest rate, and days
         if (payoutDetail.getSellerOpeningPos() != null && daysBetween > 0) {
             BigDecimal calculatedInterest = payoutDetail.getSellerOpeningPos()

@@ -1,7 +1,6 @@
 package com.finvolv.selldown.model;
 
-import jakarta.validation.constraints.DecimalMax;
-import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.*;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
@@ -50,6 +49,10 @@ public class Deal {
     protected String updatedBy;
     protected Timestamp createdAt;
     protected Timestamp updatedAt;
+
+    @Min(value = 1, message = "Month on month day must be at least 1")
+    @Max(value = 31, message = "Month on month day must be at most 31")
+    protected Integer monthOnMonthDay;
 
     public enum DealStatus {
         PENDING, IN_PROGRESS, COMPLETED, CANCELLED

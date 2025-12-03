@@ -31,6 +31,7 @@ public class DealDto {
     private String updatedBy;
     private Timestamp updatedAt;
     private List<InterestRateChange> interestRateTable;
+    private Integer monthOnMonthDay;
 }
 
 

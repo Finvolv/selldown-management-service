@@ -23,6 +23,9 @@ public interface PartnerPayoutDetailsAllRepository extends ReactiveCrudRepositor
     @Query("SELECT * FROM \"sd-partner_payout_details_all\" WHERE lms_id = :lmsId AND lms_lan = :lmsLan")
     Mono<PartnerPayoutDetailsAll> findByLmsIdAndLmsLan(Long lmsId, String lmsLan);
     
+    @Query("SELECT * FROM \"sd-partner_payout_details_all\" WHERE lms_id = :lmsId AND lms_lan = :lmsLan ORDER BY id DESC")
+    Flux<PartnerPayoutDetailsAll> findAllByLmsIdAndLmsLan(Long lmsId, String lmsLan);
+    
     @Query("DELETE FROM \"sd-partner_payout_details_all\" WHERE lms_id = :lmsId")
     Mono<Void> deleteByLmsId(Long lmsId);
     

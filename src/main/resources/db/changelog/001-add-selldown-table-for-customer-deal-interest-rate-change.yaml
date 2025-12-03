@@ -160,3 +160,15 @@ databaseChangeLog:
             constraintName: fk_sd_interest_rate_change_deal
             onDelete: CASCADE
 
+  - changeSet:
+      id: 002-04-add-month-on-month-day-to-sd-deal
+      author: deepak
+      changes:
+        - addColumn:
+            tableName: "sd-deal"
+            columns:
+              - column:
+                  name: month_on_month_day
+                  type: INTEGER
+                  constraints:
+                    nullable: true
