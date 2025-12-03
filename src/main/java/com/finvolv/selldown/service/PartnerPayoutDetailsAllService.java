@@ -7,6 +7,7 @@ import com.finvolv.selldown.model.MonthlyLMSStatus;
 import com.finvolv.selldown.model.MonthlyLMSStatusEntity;
 import com.finvolv.selldown.model.PartnerPayoutDetailsAll;
 import com.finvolv.selldown.repository.DealRepository;
+import com.finvolv.selldown.repository.LoanDetailRepository;
 import com.finvolv.selldown.repository.MonthlyLMSStatusRepository;
 import com.finvolv.selldown.repository.PartnerPayoutDetailsAllRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +35,7 @@ public class PartnerPayoutDetailsAllService {
     private final PartnerPayoutDetailsAllRepository partnerPayoutDetailsAllRepository;
     private final MonthlyLMSStatusRepository monthlyLMSStatusRepository;
     private final DealRepository dealRepository;
+    private final LoanDetailRepository loanDetailRepository;
     
     @Transactional
     private Flux<PartnerPayoutDetailsAll> saveAllPayoutDetails(List<PartnerPayoutDetailsAll> payoutDetails, Long lmsId) {
@@ -168,40 +170,160 @@ public class PartnerPayoutDetailsAllService {
             .flatMapMany(lmsStatusId -> {
                 logger.debug("Created/Updated LMS status with ID: {}", lmsStatusId);
                 
-                // Prepare all payout details with LMS ID and timestamps
-                List<PartnerPayoutDetailsAll> preparedPayoutDetails = payoutDetails.stream()
-                    .map(payout -> {
-                        // Set the LMS ID and current timestamp
-                        payout.setLmsId(lmsStatusId);
-                        payout.setCreatedAt(LocalDateTime.now());
-                        payout.setModifiedAt(LocalDateTime.now());
+                // Build efficient lookup maps: LAN -> DealId -> MonthOnMonthDay
+                // Load all LoanDetails and Deals once for efficient O(1) lookups
+                Mono<Map<String, Integer>> lanToMonthOnMonthDayMap = loanDetailRepository.findAll()
+                    .collectList()
+                    .flatMap(loanDetails -> {
+                        // Create map: lmsLan -> dealId
+                        Map<String, Long> lanToDealIdMap = loanDetails.stream()
+                            .filter(ld -> ld.getLmsLan() != null && ld.getDealId() != null)
+                            .collect(Collectors.toMap(
+                                LoanDetail::getLmsLan,
+                                LoanDetail::getDealId,
+                                (existing, replacement) -> existing // Keep first if duplicates
+                            ));
                         
-                        // Set cycle dates if not already set
-                        if (payout.getCycleStartDate() == null) {
-                            payout.setCycleStartDate(LocalDate.of(year, month, 1));
-                        }
-                        if (payout.getCycleEndDate() == null) {
-                            payout.setCycleEndDate(LocalDate.of(year, month, 1).withDayOfMonth(
-                                LocalDate.of(year, month, 1).lengthOfMonth()));
-                        }
+                        logger.debug("Created LAN to DealId map with {} entries", lanToDealIdMap.size());
                         
-                        // Ensure isOpeningPosMisMatch is never null (default to false)
-                        if (payout.getIsOpeningPosMisMatch() == null) {
-                            payout.setIsOpeningPosMisMatch(false);
-                        }
-                        
-                        return payout;
-                    })
-                    .toList();
+                                // Load all Deals and create map: dealId -> monthOnMonthDay
+                                // Only include deals where monthOnMonthDay is not null (must come from Deal table)
+                                return dealRepository.findAll()
+                                    .collectList()
+                                    .map(deals -> {
+                                        Map<Long, Integer> dealIdToMonthOnMonthDayMap = deals.stream()
+                                            .filter(d -> d.getId() != null && d.getMonthOnMonthDay() != null)
+                                            .collect(Collectors.toMap(
+                                                Deal::getId,
+                                                Deal::getMonthOnMonthDay,
+                                                (existing, replacement) -> existing
+                                            ));
+                                        
+                                        logger.debug("Created DealId to MonthOnMonthDay map with {} entries (only deals with monthOnMonthDay set)", 
+                                            dealIdToMonthOnMonthDayMap.size());
+                                        
+                                        // Combine maps: lmsLan -> monthOnMonthDay
+                                        // Only include entries where monthOnMonthDay exists in Deal table
+                                        Map<String, Integer> result = lanToDealIdMap.entrySet().stream()
+                                            .filter(entry -> dealIdToMonthOnMonthDayMap.containsKey(entry.getValue()))
+                                            .collect(Collectors.toMap(
+                                                Map.Entry::getKey,
+                                                entry -> dealIdToMonthOnMonthDayMap.get(entry.getValue()),
+                                                (existing, replacement) -> existing
+                                            ));
+                                        
+                                        logger.debug("Created final LAN to MonthOnMonthDay map with {} entries (all from Deal table)", result.size());
+                                        return result;
+                                    });
+                    });
                 
-                // Save all payout details in a single transaction (update if exists, create if not)
-                return saveAllPayoutDetails(preparedPayoutDetails, lmsStatusId)
-                    .doOnComplete(() -> 
-                        logger.info("Successfully uploaded LMS file - year: {}, month: {}, records: {}", 
-                            year, month, payoutDetails.size()))
-                    .doOnError(error -> 
-                        logger.error("Error uploading LMS file - year: {}, month: {}: {}", 
-                            year, month, error.getMessage()));
+                // Use the lookup map to prepare payout details reactively
+                return lanToMonthOnMonthDayMap
+                    .flatMapMany(monthOnMonthDayMap -> {
+                        logger.info("Lookup map contains {} entries. Processing {} payout details.", 
+                            monthOnMonthDayMap.size(), payoutDetails.size());
+                        
+                        // Process each payout detail reactively to ensure monthOnMonthDay is always found
+                        return Flux.fromIterable(payoutDetails)
+                            .flatMap(payout -> {
+                                // Set the LMS ID and current timestamp
+                                payout.setLmsId(lmsStatusId);
+                                payout.setCreatedAt(LocalDateTime.now());
+                                payout.setModifiedAt(LocalDateTime.now());
+                                
+                                // Get monthOnMonthDay from map
+                                Integer monthOnMonthDay = monthOnMonthDayMap.get(payout.getLmsLan());
+                                
+                                // If not found in map, look it up directly from Deal table
+                                Mono<Integer> monthOnMonthDayMono;
+                                if (monthOnMonthDay != null) {
+                                    monthOnMonthDayMono = Mono.just(monthOnMonthDay);
+                                    logger.debug("Found monthOnMonthDay={} for LAN {} in lookup map (from Deal table)", monthOnMonthDay, payout.getLmsLan());
+                                } else {
+                                    logger.warn("monthOnMonthDay not found in lookup map for LAN: {}. Attempting direct lookup from Deal table.", payout.getLmsLan());
+                                    // Look up directly from Deal table: find LoanDetail by LAN, then get Deal, then get monthOnMonthDay
+                                    monthOnMonthDayMono = loanDetailRepository.findAll()
+                                        .filter(ld -> payout.getLmsLan() != null && payout.getLmsLan().equals(ld.getLmsLan()))
+                                        .next()
+                                        .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                            "No LoanDetail found for LAN: " + payout.getLmsLan() + ". Cannot determine monthOnMonthDay from Deal table.")))
+                                        .flatMap(loanDetail -> {
+                                            if (loanDetail.getDealId() == null) {
+                                                return Mono.error(new IllegalArgumentException(
+                                                    "LoanDetail for LAN " + payout.getLmsLan() + " has no dealId. Cannot retrieve monthOnMonthDay from Deal table."));
+                                            }
+                                            return dealRepository.findById(loanDetail.getDealId())
+                                                .switchIfEmpty(Mono.error(new IllegalArgumentException(
+                                                    "Deal with ID " + loanDetail.getDealId() + " not found for LAN " + payout.getLmsLan() + ". Cannot retrieve monthOnMonthDay.")))
+                                                .map(deal -> {
+                                                    Integer momDay = deal.getMonthOnMonthDay();
+                                                    if (momDay == null) {
+                                                        throw new IllegalArgumentException(
+                                                            "monthOnMonthDay is null in Deal " + deal.getId() + " for LAN " + payout.getLmsLan() + 
+                                                            ". monthOnMonthDay must be set in Deal table.");
+                                                    }
+                                                    logger.info("Retrieved monthOnMonthDay={} from Deal table for LAN {} (Deal {})", 
+                                                        momDay, payout.getLmsLan(), deal.getId());
+                                                    return momDay;
+                                                });
+                                        })
+                                        .onErrorResume(error -> {
+                                            logger.error("Failed to retrieve monthOnMonthDay from Deal table for LAN {}: {}", 
+                                                payout.getLmsLan(), error.getMessage());
+                                            return Mono.error(error);
+                                        });
+                                }
+                                
+                                return monthOnMonthDayMono.map(momDay -> {
+                                    // Set cycle dates if not already set, using monthOnMonthDay
+                                    // Start date: previous month's day (e.g., if monthOnMonthDay=20 and month=9, start = Aug 20)
+                                    // End date: current month's day (e.g., if monthOnMonthDay=20 and month=9, end = Sep 20)
+                                    if (payout.getCycleStartDate() == null || payout.getCycleEndDate() == null) {
+                                        // Calculate previous month and year
+                                        int prevMonth = (month == 1) ? 12 : month - 1;
+                                        int prevYear = (month == 1) ? year - 1 : year;
+                                        
+                                        // Ensure the day is valid for the previous month
+                                        LocalDate prevMonthDate = LocalDate.of(prevYear, prevMonth, 1);
+                                        int maxDayInPrevMonth = prevMonthDate.lengthOfMonth();
+                                        int dayToUseStart = Math.min(momDay, maxDayInPrevMonth);
+                                        
+                                        // Ensure the day is valid for the current month
+                                        LocalDate currentMonthDate = LocalDate.of(year, month, 1);
+                                        int maxDayInCurrentMonth = currentMonthDate.lengthOfMonth();
+                                        int dayToUseEnd = Math.min(momDay, maxDayInCurrentMonth);
+                                        
+                                        if (payout.getCycleStartDate() == null) {
+                                            payout.setCycleStartDate(LocalDate.of(prevYear, prevMonth, dayToUseStart));
+                                        }
+                                        if (payout.getCycleEndDate() == null) {
+                                            payout.setCycleEndDate(LocalDate.of(year, month, dayToUseEnd));
+                                        }
+                                        
+                                        logger.info("Set cycle dates for LAN {}: start={}, end={}, monthOnMonthDay={}", 
+                                            payout.getLmsLan(), payout.getCycleStartDate(), payout.getCycleEndDate(), momDay);
+                                    }
+                                    
+                                    // Ensure isOpeningPosMisMatch is never null (default to false)
+                                    if (payout.getIsOpeningPosMisMatch() == null) {
+                                        payout.setIsOpeningPosMisMatch(false);
+                                    }
+                                    
+                                    return payout;
+                                });
+                            })
+                            .collectList();
+                    })
+                    .flatMap(preparedPayoutDetails -> 
+                        // Save all payout details in a single transaction (update if exists, create if not)
+                        saveAllPayoutDetails(preparedPayoutDetails, lmsStatusId)
+                            .doOnComplete(() -> 
+                                logger.info("Successfully uploaded LMS file - year: {}, month: {}, records: {}", 
+                                    year, month, payoutDetails.size()))
+                            .doOnError(error -> 
+                                logger.error("Error uploading LMS file - year: {}, month: {}: {}", 
+                                    year, month, error.getMessage()))
+                    );
             });
     }
     
@@ -301,6 +423,7 @@ public class PartnerPayoutDetailsAllService {
 
         Double assignRatio = deal.getAssignRatio();
         Double annualInterestRate = deal.getAnnualInterestRate();
+        Deal.InterestMethod interestMethod = deal.getInterestMethod();
         
         // Calculate days between cycle start and end date (make it final for lambda usage)
         final long daysBetween = (payoutDetail.getCycleStartDate() != null && payoutDetail.getCycleEndDate() != null) ?
@@ -308,9 +431,6 @@ public class PartnerPayoutDetailsAllService {
                 payoutDetail.getCycleStartDate(), 
                 payoutDetail.getCycleEndDate()
             ) : 0L;
-
-        // Calculate daily interest rate
-        Double dailyInterestRate = annualInterestRate / 365.0;
 
         // Calculate seller fields by multiplying with assigned ratio for POS related fields
         payoutDetail.setSellerOpeningPos(calculateValue(payoutDetail.getOpeningPos(), assignRatio));
@@ -326,13 +446,20 @@ public class PartnerPayoutDetailsAllService {
         payoutDetail.setSellerPrepaymentChargesPaid(calculateValue(payoutDetail.getPrepaymentChargesPaid(), assignRatio));
         payoutDetail.setSellerTotalChargesPaid(calculateValue(payoutDetail.getTotalChargesPaid(), assignRatio));
         payoutDetail.setSellerTotalPaid(calculateValue(payoutDetail.getTotalPaid(), assignRatio));
-logger.info("annualInterestRate: {}", annualInterestRate);
-logger.info("daysBetween: {}", daysBetween);
-        // Calculate interest based on seller opening position, interest rate, and days
+        
+        // Calculate interest based on seller opening position, interest rate, and interest method
         if (payoutDetail.getSellerOpeningPos() != null && daysBetween > 0) {
+            // Calculate interest multiplier based on InterestMethod
+            Double interestMultiplier = calculateInterestMultiplier(
+                interestMethod, 
+                payoutDetail.getCycleStartDate(), 
+                payoutDetail.getCycleEndDate(),
+                daysBetween
+            );
+            
             BigDecimal calculatedInterest = payoutDetail.getSellerOpeningPos()
-                .multiply(BigDecimal.valueOf(dailyInterestRate))
-                .multiply(BigDecimal.valueOf(daysBetween))
+                .multiply(BigDecimal.valueOf(annualInterestRate))
+                .multiply(BigDecimal.valueOf(interestMultiplier))
                 .setScale(2, RoundingMode.HALF_UP);
             
             payoutDetail.setSellerTotalInterestDue(calculatedInterest);
@@ -441,6 +568,38 @@ logger.info("daysBetween: {}", daysBetween);
             }
             return BigDecimal.ZERO;
         });
+    }
+
+    /**
+     * Calculate interest multiplier based on InterestMethod
+     * Uses daysBetween (cycleEndDate - cycleStartDate) for actual day calculations
+     */
+    private Double calculateInterestMultiplier(Deal.InterestMethod interestMethod, LocalDate startDate, LocalDate endDate, long daysBetween) {
+        if (interestMethod == null) {
+            // Default fallback to ACTUAL_BY_360 if method is null
+            return daysBetween / 360.0;
+        }
+
+        switch (interestMethod) {
+            case ONE_TWELFTH:
+                return 1.0 / 12.0;
+                
+            case ACTUAL_BY_360:
+                return daysBetween / 360.0;
+                
+            case ACTUAL_BY_365:
+                return daysBetween / 365.0;
+                
+            case ACTUAL_BY_ACTUAL:
+                // Use 366 for leap year, 365 otherwise
+                // Use the start date to determine if it's a leap year
+                int actualDaysInYear = (startDate != null && startDate.isLeapYear()) ? 366 : 365;
+                return daysBetween / (double) actualDaysInYear;
+                
+            default:
+                // Default fallback to ACTUAL_BY_360
+                return daysBetween / 360.0;
+        }
     }
 
     /**

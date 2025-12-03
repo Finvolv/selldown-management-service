@@ -424,18 +424,31 @@ public class LoanDetailController {
         
         logger.info("Extracted {} LMS LANs from loan details", lmsLans.size());
         
-        return Flux.fromIterable(lmsLans)
-            .flatMap(lmsLan -> partnerPayoutDetailsAllRepository.findByLmsLanAndYearAndMonth(lmsLan, year, month))
-            .collectList()
-            .flatMap(matchedPayoutDetails -> {
-                logger.info("Found {} matching payout details for year: {}, month: {}", matchedPayoutDetails.size(), year, month);
+        // First get the lmsId from MonthlyLMSStatus using year and month
+        // This is more reliable than extracting from cycle_start_date which may be in previous month
+        return monthlyLMSStatusRepository.findByYearAndMonth(year, month)
+            .switchIfEmpty(Mono.error(new RuntimeException(
+                String.format("No LMS status found for year: %d, month: %d", year, month))))
+            .flatMap(lmsStatus -> {
+                Long lmsId = lmsStatus.getId();
+                logger.info("Found LMS status with ID: {} for year: {}, month: {}", lmsId, year, month);
                 
-                if (matchedPayoutDetails.isEmpty()) {
-                    return Mono.just(createEmptyResponse(dealId, partnerId, year, month, loanDetails, "No matching payout details found"));
-                }
-                
-                // Step 3: Get deal and process calculations
-                return processCalculationsAndDiscrepancies(dealId, partnerId, year, month, loanDetails, matchedPayoutDetails);
+                // Query by lms_id and lms_lan instead of using cycle_start_date extraction
+                return Flux.fromIterable(lmsLans)
+                    .flatMap(lmsLan -> partnerPayoutDetailsAllRepository.findAllByLmsIdAndLmsLan(lmsId, lmsLan))
+                    .collectList()
+                    .flatMap(matchedPayoutDetails -> {
+                        logger.info("Found {} matching payout details for year: {}, month: {}, lmsId: {}", 
+                            matchedPayoutDetails.size(), year, month, lmsId);
+                        
+                        if (matchedPayoutDetails.isEmpty()) {
+                            return Mono.just(createEmptyResponse(dealId, partnerId, year, month, loanDetails, 
+                                "No matching payout details found for the specified year and month"));
+                        }
+                        
+                        // Step 3: Get deal and process calculations
+                        return processCalculationsAndDiscrepancies(dealId, partnerId, year, month, loanDetails, matchedPayoutDetails);
+                    });
             });
     }
     
