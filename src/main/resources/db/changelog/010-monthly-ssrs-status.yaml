@@ -1,0 +1,83 @@
+databaseChangeLog:
+  - changeSet:
+      id: 010-create-monthly-ssrs-status-table
+      author: system
+      changes:
+        - createSequence:
+            sequenceName: sd_monthly_ssrs_status_id_seq
+            startValue: 1
+            incrementBy: 1
+        - createTable:
+            tableName: "sd-monthly_ssrs_status"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  defaultValueComputed: "nextval('sd_monthly_ssrs_status_id_seq')"
+              - column:
+                  name: year
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: month
+                  type: INTEGER
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cycle_start_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: cycle_end_date
+                  type: DATE
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - createIndex:
+            tableName: "sd-monthly_ssrs_status"
+            indexName: idx_monthly_ssrs_status_year_month
+            columns:
+              - column:
+                  name: year
+              - column:
+                  name: month
+        - createIndex:
+            tableName: "sd-monthly_ssrs_status"
+            indexName: idx_monthly_ssrs_status_status
+            columns:
+              - column:
+                  name: status
+        - createIndex:
+            tableName: "sd-monthly_ssrs_status"
+            indexName: idx_monthly_ssrs_status_year_month_status
+            columns:
+              - column:
+                  name: year
+              - column:
+                  name: month
+              - column:
+                  name: status
+        - addUniqueConstraint:
+            tableName: "sd-monthly_ssrs_status"
+            constraintName: uk_monthly_ssrs_status_year_month
+            columnNames: year, month
+

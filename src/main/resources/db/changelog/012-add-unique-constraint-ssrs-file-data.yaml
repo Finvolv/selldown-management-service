@@ -1,0 +1,13 @@
+databaseChangeLog:
+  - changeSet:
+      id: 012-add-unique-constraint-ssrs-file-data
+      author: system
+      changes:
+        - dropIndex:
+            tableName: "sd-ssrs_file_data"
+            indexName: idx_ssrs_file_data_monthly_ssrs_id_lms_lan
+        - addUniqueConstraint:
+            tableName: "sd-ssrs_file_data"
+            constraintName: uk_ssrs_file_data_monthly_ssrs_id_lms_lan
+            columnNames: monthly_ssrs_id, lms_lan
+

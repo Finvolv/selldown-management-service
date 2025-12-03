@@ -188,24 +188,23 @@ public class PartnerPayoutDetailsAllService {
     /**
      * Calculates seller fields based on assigned ratio and interest rate from deal table
      * This method can be easily modified to change calculation logic
+     * Reactive version that handles previous month data lookup
      */
-    public PartnerPayoutDetailsAll calculateSellerFields(PartnerPayoutDetailsAll payoutDetail, Deal deal) {
+    public Mono<PartnerPayoutDetailsAll> calculateSellerFields(PartnerPayoutDetailsAll payoutDetail, Deal deal, LoanDetail loanDetail, Integer year, Integer month) {
         if (deal == null || deal.getAssignRatio() == null || deal.getAnnualInterestRate() == null) {
             logger.warn("Deal or required fields are null, skipping calculation for payout detail: {}", payoutDetail.getId());
-            return payoutDetail;
+            return Mono.just(payoutDetail);
         }
 
         Double assignRatio = deal.getAssignRatio();
         Double annualInterestRate = deal.getAnnualInterestRate();
         
-        // Calculate days between cycle start and end date
-        long daysBetween = 0;
-        if (payoutDetail.getCycleStartDate() != null && payoutDetail.getCycleEndDate() != null) {
-            daysBetween = java.time.temporal.ChronoUnit.DAYS.between(
+        // Calculate days between cycle start and end date (make it final for lambda usage)
+        final long daysBetween = (payoutDetail.getCycleStartDate() != null && payoutDetail.getCycleEndDate() != null) ?
+            java.time.temporal.ChronoUnit.DAYS.between(
                 payoutDetail.getCycleStartDate(), 
                 payoutDetail.getCycleEndDate()
-            );
-        }
+            ) : 0L;
 
         // Calculate daily interest rate
         Double dailyInterestRate = annualInterestRate / 365.0;
@@ -225,14 +224,6 @@ public class PartnerPayoutDetailsAllService {
         payoutDetail.setSellerTotalChargesPaid(calculateValue(payoutDetail.getTotalChargesPaid(), assignRatio));
         payoutDetail.setSellerTotalPaid(calculateValue(payoutDetail.getTotalPaid(), assignRatio));
 
-
-
-        //Not sure about this
-        payoutDetail.setSellerInterestOverduePaid(calculateValue(payoutDetail.getInterestOverduePaid(), assignRatio)); ///Not sure about this
-        payoutDetail.setSellerInterestOverdue(calculateValue(payoutDetail.getInterestOverdue(), assignRatio)); //Not sure about this
-
-      
-
         // Calculate interest based on seller opening position, interest rate, and days
         if (payoutDetail.getSellerOpeningPos() != null && daysBetween > 0) {
             BigDecimal calculatedInterest = payoutDetail.getSellerOpeningPos()
@@ -249,14 +240,103 @@ public class PartnerPayoutDetailsAllService {
         } else {
             payoutDetail.setSellerTotalInterestComponentPaid(BigDecimal.ZERO);
         }
-        
-       
 
+        // Calculate sellerInterestOverdue reactively:
+        // - If previous month is empty: from LoanDetail currentAssignedOverdueInterest
+        // - If previous month exists: from previous month (sellerTotalInterestDue - sellerTotalInterestComponentPaid)
+        return calculateSellerInterestOverdueReactive(payoutDetail, loanDetail, year, month)
+            .map(sellerInterestOverdue -> {
+                payoutDetail.setSellerInterestOverdue(sellerInterestOverdue);
+                
+                // Calculate sellerInterestOverduePaid:
+                // - If sellerInterestOverdue > 0: sellerTotalInterestComponentPaid - (sellerTotalInterestDue - sellerInterestOverdue)
+                // - Otherwise: 0
+                BigDecimal sellerInterestOverduePaid = BigDecimal.ZERO;
+                if (sellerInterestOverdue != null && sellerInterestOverdue.compareTo(BigDecimal.ZERO) > 0) {
+                    BigDecimal sellerTotalInterestDue = payoutDetail.getSellerTotalInterestDue() != null ? 
+                        payoutDetail.getSellerTotalInterestDue() : BigDecimal.ZERO;
+                    BigDecimal sellerTotalInterestComponentPaid = payoutDetail.getSellerTotalInterestComponentPaid() != null ? 
+                        payoutDetail.getSellerTotalInterestComponentPaid() : BigDecimal.ZERO;
+                    
+                    sellerInterestOverduePaid = sellerTotalInterestComponentPaid
+                        .subtract(sellerTotalInterestDue.subtract(sellerInterestOverdue))
+                        .setScale(2, RoundingMode.HALF_UP);
+                    
+                    // Ensure non-negative
+                    if (sellerInterestOverduePaid.compareTo(BigDecimal.ZERO) < 0) {
+                        sellerInterestOverduePaid = BigDecimal.ZERO;
+                    }
+                }
+                payoutDetail.setSellerInterestOverduePaid(sellerInterestOverduePaid);
+                
+                logger.debug("Calculated seller fields for payout detail {} with assign ratio: {}, interest rate: {}, days: {}", 
+                    payoutDetail.getId(), assignRatio, annualInterestRate, daysBetween);
+                
+                return payoutDetail;
+            });
+    }
 
-        logger.debug("Calculated seller fields for payout detail {} with assign ratio: {}, interest rate: {}, days: {}", 
-            payoutDetail.getId(), assignRatio, annualInterestRate, daysBetween);
+    /**
+     * Helper method to calculate sellerInterestOverdue reactively
+     * - If previous month is empty: from LoanDetail currentAssignedOverdueInterest
+     * - If previous month exists: from previous month (sellerTotalInterestDue - sellerTotalInterestComponentPaid)
+     */
+    private Mono<BigDecimal> calculateSellerInterestOverdueReactive(PartnerPayoutDetailsAll payoutDetail, LoanDetail loanDetail, Integer year, Integer month) {
+        // Calculate previous month and year
+        final Integer prevMonth;
+        final Integer prevYear;
         
-        return payoutDetail;
+        if (month == null) {
+            prevMonth = null;
+            prevYear = year;
+        } else if (month == 1) {
+            prevMonth = 12;
+            prevYear = year != null ? year - 1 : null;
+        } else {
+            prevMonth = month - 1;
+            prevYear = year;
+        }
+        
+        // Try to get previous month payout detail reactively
+        if (payoutDetail.getLmsLan() != null && prevYear != null && prevMonth != null) {
+            return partnerPayoutDetailsAllRepository
+                .findByLmsLanAndYearAndMonth(payoutDetail.getLmsLan(), prevYear, prevMonth)
+                .next()
+                .map(previousPayout -> {
+                    // Previous month exists - calculate from previous month
+                    BigDecimal prevSellerTotalInterestDue = previousPayout.getSellerTotalInterestDue() != null ? 
+                        previousPayout.getSellerTotalInterestDue() : BigDecimal.ZERO;
+                    BigDecimal prevSellerTotalInterestComponentPaid = previousPayout.getSellerTotalInterestComponentPaid() != null ? 
+                        previousPayout.getSellerTotalInterestComponentPaid() : BigDecimal.ZERO;
+                    
+                    BigDecimal sellerInterestOverdue = prevSellerTotalInterestDue.subtract(prevSellerTotalInterestComponentPaid)
+                        .setScale(2, RoundingMode.HALF_UP);
+                    
+                    // Ensure non-negative
+                    if (sellerInterestOverdue.compareTo(BigDecimal.ZERO) < 0) {
+                        sellerInterestOverdue = BigDecimal.ZERO;
+                    }
+                    
+                    return sellerInterestOverdue;
+                })
+                .switchIfEmpty(Mono.fromCallable(() -> {
+                    // No previous month data - use LoanDetail currentAssignedOverdueInterest for first month
+                    if (loanDetail != null && loanDetail.getCurrentAssignedOverdueInterest() != null) {
+                        return BigDecimal.valueOf(loanDetail.getCurrentAssignedOverdueInterest())
+                            .setScale(2, RoundingMode.HALF_UP);
+                    }
+                    return BigDecimal.ZERO;
+                }));
+        }
+        
+        // No previous month data - use LoanDetail currentAssignedOverdueInterest for first month
+        return Mono.fromCallable(() -> {
+            if (loanDetail != null && loanDetail.getCurrentAssignedOverdueInterest() != null) {
+                return BigDecimal.valueOf(loanDetail.getCurrentAssignedOverdueInterest())
+                    .setScale(2, RoundingMode.HALF_UP);
+            }
+            return BigDecimal.ZERO;
+        });
     }
 
     /**

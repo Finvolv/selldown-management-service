@@ -1,0 +1,72 @@
+databaseChangeLog:
+  - changeSet:
+      id: 011-create-ssrs-file-data-table
+      author: system
+      changes:
+        - createSequence:
+            sequenceName: sd_ssrs_file_data_id_seq
+            startValue: 1
+            incrementBy: 1
+        - createTable:
+            tableName: "sd-ssrs_file_data"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+                  defaultValueComputed: "nextval('sd_ssrs_file_data_id_seq')"
+              - column:
+                  name: monthly_ssrs_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lms_lan
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: metadata
+                  type: JSONB
+                  constraints:
+                    nullable: true
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  constraints:
+                    nullable: false
+        - addForeignKeyConstraint:
+            baseTableName: "sd-ssrs_file_data"
+            baseColumnNames: monthly_ssrs_id
+            constraintName: fk_ssrs_file_data_monthly_ssrs_id
+            referencedTableName: "sd-monthly_ssrs_status"
+            referencedColumnNames: id
+            onDelete: CASCADE
+        - createIndex:
+            tableName: "sd-ssrs_file_data"
+            indexName: idx_ssrs_file_data_monthly_ssrs_id
+            columns:
+              - column:
+                  name: monthly_ssrs_id
+        - createIndex:
+            tableName: "sd-ssrs_file_data"
+            indexName: idx_ssrs_file_data_lms_lan
+            columns:
+              - column:
+                  name: lms_lan
+        - createIndex:
+            tableName: "sd-ssrs_file_data"
+            indexName: idx_ssrs_file_data_monthly_ssrs_id_lms_lan
+            columns:
+              - column:
+                  name: monthly_ssrs_id
+              - column:
+                  name: lms_lan
+

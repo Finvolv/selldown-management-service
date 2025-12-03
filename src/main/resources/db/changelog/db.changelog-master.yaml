@@ -17,5 +17,11 @@ databaseChangeLog:
       file: classpath:db/changelog/008-make-payout-fields-nullable.yaml
   - include:
       file: classpath:db/changelog/009-add-opening-pos-mismatch-flag.yaml
+  - include:
+      file: classpath:db/changelog/010-monthly-ssrs-status.yaml
+  - include:
+      file: classpath:db/changelog/011-ssrs-file-data.yaml
+  - include:
+      file: classpath:db/changelog/012-add-unique-constraint-ssrs-file-data.yaml
 
 

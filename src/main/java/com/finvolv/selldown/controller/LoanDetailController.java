@@ -8,12 +8,15 @@ import com.finvolv.selldown.model.MonthlyDealProcessingStatus;
 import com.finvolv.selldown.model.MonthlyDealStatus;
 import com.finvolv.selldown.model.MonthlyLMSStatusEntity;
 import com.finvolv.selldown.model.PartnerPayoutDetailsAll;
+import com.finvolv.selldown.model.SSRSFileDataEntity;
 import com.finvolv.selldown.repository.LoanDetailRepository;
 import com.finvolv.selldown.repository.MonthlyDealProcessingStatusRepository;
 import com.finvolv.selldown.repository.MonthlyLMSStatusRepository;
 import com.finvolv.selldown.repository.PartnerPayoutDetailsAllRepository;
 import com.finvolv.selldown.service.PartnerPayoutDetailsAllService;
 import com.finvolv.selldown.service.ExcelExportService;
+import com.finvolv.selldown.service.SSRSExcelExportService;
+import com.finvolv.selldown.service.SSRSFileService;
 import com.finvolv.selldown.service.DocumentUploadService;
 import com.finvolv.selldown.service.LoanDetailService;
 import com.finvolv.selldown.service.LoanDetailService.LoanDetailInputForDeal;
@@ -31,6 +34,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/loan-details")
@@ -48,6 +52,8 @@ public class LoanDetailController {
     private final PartnerPayoutDetailsAllRepository partnerPayoutDetailsAllRepository;
     private final PartnerPayoutDetailsAllService partnerPayoutDetailsAllService;
     private final ExcelExportService excelExportService;
+    private final SSRSExcelExportService ssrsExcelExportService;
+    private final SSRSFileService ssrsFileService;
     private final DocumentUploadService documentUploadService;
 
     @PostMapping(
@@ -238,52 +244,150 @@ public class LoanDetailController {
                     )));
                 }
 
-                byte[] bytes = excelExportService.buildPartnerPayoutReport(payouts);
                 String filename = String.format("partner-payout-%d-%d-%d-%d.xlsx", dealId, partnerId, year, month);
+                
+                return excelExportService.buildPartnerPayoutReport(payouts, dealId, partnerId)
+                        .flatMap(bytes -> {
+                            if (Boolean.TRUE.equals(upload)) {
+                                if (authorization == null || authorization.isBlank()) {
+                                    return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                                        "success", false,
+                                        "message", "Authorization header is required for upload=true"
+                                    )));
+                                }
 
-                if (Boolean.TRUE.equals(upload)) {
-                    if (authorization == null || authorization.isBlank()) {
-                        return Mono.just(ResponseEntity.badRequest().body(Map.of(
-                            "success", false,
-                            "message", "Authorization header is required for upload=true"
-                        )));
-                    }
+                                return partnerPayoutDetailsAllService.getDealById(dealId)
+                                    .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
+                                        .flatMap(partnerName -> documentUploadService.generateUploadId(authorization, partnerName, deal.getName(), year, month)
+                                            .flatMap(generatedId -> documentUploadService.uploadExcel(authorization, generatedId, bytes, filename)
+                                                .then(
+                                                    monthlyDealProcessingStatusRepository
+                                                        .findByDealIdAndPartnerIdAndYearAndMonth(dealId, partnerId, year, month)
+                                                        .flatMap(status -> {
+                                                            status.setStatus(MonthlyDealStatus.PAYOUT_FILE_GENERATED);
+                                                            status.setModifiedAt(LocalDateTime.now());
+                                                            return monthlyDealProcessingStatusRepository.save(status);
+                                                        })
+                                                )
+                                                .thenReturn(ResponseEntity.ok(Map.of(
+                                                    "success", true,
+                                                    "generatedId", generatedId,
+                                                    "message", "File uploaded successfully"
+                                                ))))));
+                            }
 
-                    return partnerPayoutDetailsAllService.getDealById(dealId)
-                        .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
-                            .flatMap(partnerName -> documentUploadService.generateUploadId(authorization, partnerName, deal.getName(), year, month)
-                                .flatMap(generatedId -> documentUploadService.uploadExcel(authorization, generatedId, bytes, filename)
-                                    .then(
-                                        monthlyDealProcessingStatusRepository
-                                            .findByDealIdAndPartnerIdAndYearAndMonth(dealId, partnerId, year, month)
-                                            .flatMap(status -> {
-                                                status.setStatus(MonthlyDealStatus.PAYOUT_FILE_GENERATED);
-                                                status.setModifiedAt(LocalDateTime.now());
-                                                return monthlyDealProcessingStatusRepository.save(status);
-                                            })
-                                    )
-                                    .thenReturn(ResponseEntity.ok(Map.of(
-                                        "success", true,
-                                        "generatedId", generatedId,
-                                        "message", "File uploaded successfully"
-                                    ))))));
-                }
-
-                // Update status to PAYOUT_FILE_GENERATED for successful generation (download flow)
-                return monthlyDealProcessingStatusRepository
-                    .findByDealIdAndPartnerIdAndYearAndMonth(dealId, partnerId, year, month)
-                    .flatMap(status -> {
-                        status.setStatus(MonthlyDealStatus.PAYOUT_FILE_GENERATED);
-                        status.setModifiedAt(LocalDateTime.now());
-                        return monthlyDealProcessingStatusRepository.save(status);
-                    })
-                    .then(Mono.fromSupplier(() ->
-                        ResponseEntity.ok()
-                            .header("Content-Disposition", "attachment; filename=" + filename)
-                            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                            .body(bytes)
-                    ));
+                            // Update status to PAYOUT_FILE_GENERATED for successful generation (download flow)
+                            return monthlyDealProcessingStatusRepository
+                                .findByDealIdAndPartnerIdAndYearAndMonth(dealId, partnerId, year, month)
+                                .flatMap(status -> {
+                                    status.setStatus(MonthlyDealStatus.PAYOUT_FILE_GENERATED);
+                                    status.setModifiedAt(LocalDateTime.now());
+                                    return monthlyDealProcessingStatusRepository.save(status);
+                                })
+                                .then(Mono.fromSupplier(() ->
+                                    ResponseEntity.ok()
+                                        .header("Content-Disposition", "attachment; filename=" + filename)
+                                        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                                        .body(bytes)
+                                ));
+                        });
             });
+    }
+
+    @GetMapping(value = "/excel-generation-file/finance/deal/{dealId}/partner/{partnerId}/year/{year}/month/{month}")
+    public Mono<ResponseEntity<?>> downloadOrUploadSSRSExcel(
+        @RequestHeader(value = "Authorization", required = false) String authorization,
+        @RequestParam(value = "upload", required = false, defaultValue = "true") Boolean upload,
+        @PathVariable Long dealId,
+        @PathVariable Long partnerId,
+        @PathVariable Integer year,
+        @PathVariable Integer month
+    ) {
+        logger.info("Received SSRS Excel generation request - dealId: {}, partnerId: {}, year: {}, month: {}", 
+            dealId, partnerId, year, month);
+        
+        // Step 1: Get loan details for deal and partner
+        return loanDetailRepository.findByDealIdAndPartnerId(dealId, partnerId)
+            .collectList()
+            .flatMap(loanDetails -> {
+                logger.info("Found {} loan details for dealId: {}, partnerId: {}", loanDetails.size(), dealId, partnerId);
+                
+                if (loanDetails.isEmpty()) {
+                    return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "No loan details found"
+                    )));
+                }
+                
+                // Step 2: Get SSRS data for year and month
+                return ssrsFileService.getSSRSFileDataByYearAndMonth(year, month)
+                    .collectList()
+                    .flatMap(ssrsDataList -> {
+                        logger.info("Found {} SSRS records for year: {}, month: {}", ssrsDataList.size(), year, month);
+                        
+                        if (ssrsDataList.isEmpty()) {
+                            return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                                "success", false,
+                                "message", "No SSRS data found for the specified year and month"
+                            )));
+                        }
+                        
+                        // Step 3: Match loan details with SSRS data by lmsLan
+                        List<String> loanLans = loanDetails.stream()
+                            .map(LoanDetail::getLmsLan)
+                            .filter(lan -> lan != null && !lan.trim().isEmpty())
+                            .toList();
+                        
+                        List<SSRSFileDataEntity> matchedSSRSData = ssrsDataList.stream()
+                            .filter(ssrs -> loanLans.contains(ssrs.getLmsLan()))
+                            .toList();
+                        
+                        logger.info("Matched {} SSRS records with loan details", matchedSSRSData.size());
+                        
+                        if (matchedSSRSData.isEmpty()) {
+                            return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                                "success", false,
+                                "message", "No matching SSRS data found for loan details"
+                            )));
+                        }
+                        
+                        String filename = String.format("ssrs-finance-%d-%d-%d-%d.xlsx", dealId, partnerId, year, month);
+                        
+                        // Step 4: Generate Excel
+                        return ssrsExcelExportService.buildSSRSReport(matchedSSRSData, year, month, dealId)
+                            .flatMap(bytes -> {
+                                if (Boolean.TRUE.equals(upload)) {
+                                    if (authorization == null || authorization.isBlank()) {
+                                        return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                                            "success", false,
+                                            "message", "Authorization header is required for upload=true"
+                                        )));
+                                    }
+
+                                    return partnerPayoutDetailsAllService.getDealById(dealId)
+                                        .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
+                                            .flatMap(partnerName -> documentUploadService.generateUploadIdForFinance(
+                                                    authorization, partnerName, deal.getName(), year, month)
+                                                .flatMap(generatedId -> documentUploadService.uploadExcel(authorization, generatedId, bytes, filename)
+                                                    .thenReturn(ResponseEntity.ok(Map.of(
+                                                        "success", true,
+                                                        "generatedId", generatedId,
+                                                        "message", "SSRS finance file uploaded successfully"
+                                                    ))))));
+                                }
+
+                                // Download flow
+                                return Mono.fromSupplier(() ->
+                                    ResponseEntity.ok()
+                                        .header("Content-Disposition", "attachment; filename=" + filename)
+                                        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                                        .body(bytes)
+                                );
+                            });
+                    });
+            })
+            .doOnError(error -> logger.error("Error generating SSRS Excel - dealId: {}, partnerId: {}, year: {}, month: {}: {}", 
+                dealId, partnerId, year, month, error.getMessage(), error));
     }
 
     // Removed separate upload endpoint per request; unified into the single endpoint above controlled by ?upload=true
@@ -343,17 +447,28 @@ public class LoanDetailController {
                 logger.info("Successfully fetched deal: ID={}, Name={}, AssignRatio={}", 
                     deal.getId(), deal.getName(), deal.getAssignRatio());
                 
-                // Apply calculations to matched payout details
-                List<PartnerPayoutDetailsAll> calculatedPayoutDetails = matchedPayoutDetails.stream()
-                    .map(payoutDetail -> partnerPayoutDetailsAllService.calculateSellerFields(payoutDetail, deal))
-                    .toList();
+                // Create a map of loan details by lmsLan for quick lookup
+                Map<String, LoanDetail> loanDetailMap = loanDetails.stream()
+                    .filter(ld -> ld.getLmsLan() != null)
+                    .collect(Collectors.toMap(LoanDetail::getLmsLan, ld -> ld, (existing, replacement) -> existing));
                 
-                // Detect opening position mismatches (now reactive)
-                return partnerPayoutDetailsAllService.detectOpeningPosMismatches(
-                    calculatedPayoutDetails, loanDetails, year, month)
-                    .flatMap(discrepancies -> {
-                        logger.info("Detected {} opening position mismatches", discrepancies.size());
-                        return createDealStatusAndSaveData(dealId, partnerId, year, month, loanDetails, calculatedPayoutDetails, discrepancies);
+                // Apply calculations to matched payout details reactively
+                return Flux.fromIterable(matchedPayoutDetails)
+                    .flatMap(payoutDetail -> {
+                        LoanDetail loanDetail = loanDetailMap.get(payoutDetail.getLmsLan());
+                        return partnerPayoutDetailsAllService.calculateSellerFields(payoutDetail, deal, loanDetail, year, month);
+                    })
+                    .collectList()
+                    .flatMap(calculatedPayoutDetails -> {
+                        logger.info("Calculated seller fields for {} payout details", calculatedPayoutDetails.size());
+                        
+                        // Detect opening position mismatches (now reactive)
+                        return partnerPayoutDetailsAllService.detectOpeningPosMismatches(
+                            calculatedPayoutDetails, loanDetails, year, month)
+                            .flatMap(discrepancies -> {
+                                logger.info("Detected {} opening position mismatches", discrepancies.size());
+                                return createDealStatusAndSaveData(dealId, partnerId, year, month, loanDetails, calculatedPayoutDetails, discrepancies);
+                            });
                     });
             });
     }

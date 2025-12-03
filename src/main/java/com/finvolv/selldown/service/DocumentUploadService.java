@@ -57,6 +57,40 @@ public class DocumentUploadService {
             });
     }
 
+    public Mono<String> generateUploadIdForFinance(String authorizationBearerToken,
+                                         String partnerName,
+                                         String dealName,
+                                         Integer year,
+                                         Integer month) {
+        // Path format: {partnerName}/finance_sd-{dealName}-{month}-{year}
+        String fileSegment = String.format("finance_sd-%s-%d-%d", dealName, month, year);
+        String path = UriComponentsBuilder.fromPath("/loan-management-service/api/v1/document/generate/{partnerName}/{fileSegment}")
+            .buildAndExpand(partnerName, fileSegment)
+            .toUriString();
+
+        Map<String, Object> payload = Map.of(
+            "contextData", Map.of("fileType", "finance_sd"),
+            "scope", java.util.List.of("DOWNLOAD", "UPLOAD", "VIEW"),
+            "services", java.util.List.of("callbackservice"),
+            "singleFileUpload", true
+        );
+
+        return webClient.post()
+            .uri(path)
+            .header(HttpHeaders.AUTHORIZATION, authorizationBearerToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .accept(MediaType.APPLICATION_JSON)
+            .bodyValue(payload)
+            .exchangeToMono(clientResponse -> {
+                if (clientResponse.statusCode().is2xxSuccessful()) {
+                    return clientResponse.bodyToMono(Map.class)
+                        .map(resp -> (String) resp.get("generatedId"));
+                }
+                return clientResponse.bodyToMono(String.class)
+                    .flatMap(body -> Mono.error(new RuntimeException("Generate failed: " + clientResponse.statusCode() + " body=" + body)));
+            });
+    }
+
     public Mono<Void> uploadExcel(String authorizationBearerToken,
                                   String generatedId,
                                   byte[] bytes,
