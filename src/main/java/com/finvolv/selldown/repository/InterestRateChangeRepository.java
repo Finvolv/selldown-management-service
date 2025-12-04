@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono;
 
 @Repository
 public interface InterestRateChangeRepository extends ReactiveCrudRepository<InterestRateChange, Long> {
+    @Query("SELECT * FROM \"sd-interest_rate_change\" WHERE deal_id = :dealId ORDER BY start_date ASC, id ASC")
     Flux<InterestRateChange> findByDealId(Long dealId);
     
     @Query("SELECT * FROM \"sd-interest_rate_change\" WHERE deal_id = :dealId ORDER BY start_date DESC LIMIT 1")
