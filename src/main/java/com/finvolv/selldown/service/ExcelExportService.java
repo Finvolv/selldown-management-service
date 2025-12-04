@@ -243,15 +243,27 @@ public class ExcelExportService {
         // Seller Fields
         cols.put("Opening POS ( Without overdue) Sell down", p -> safeSubtract(p.getSellerOpeningPos(), p.getSellerPrincipalOverdue()));
         cols.put("Principal", p -> safeSubtract(p.getSellerTotalPrincipalComponentPaid(), p.getSellerPrincipalOverduePaid()));
-        cols.put("Interest", p -> safeSubtract(p.getSellerTotalInterestDue(), p.getSellerInterestOverdue()));
+        cols.put("Interest", p -> {
+            BigDecimal totalPaid = p.getSellerTotalInterestComponentPaid();
+            BigDecimal overduePaid = p.getSellerInterestOverduePaid();
+
+            // return 0 when sellerTotalInterestComponentPaid <= 0
+            if (totalPaid == null || totalPaid.compareTo(BigDecimal.ZERO) <= 0) {
+                return BigDecimal.ZERO;
+            }
+
+            // otherwise calculate Interest = totalPaid - overduePaid
+            return safeSubtract(totalPaid, overduePaid);
+        });
         cols.put("Principal O/d collection", PartnerPayoutDetailsAll::getSellerPrincipalOverduePaid);
-        cols.put("Overdue Interest  collection", PartnerPayoutDetailsAll::getSellerInterestOverduePaid); //ToDO
+        cols.put("Overdue Interest  collection", PartnerPayoutDetailsAll::getSellerInterestOverduePaid);
         cols.put("Pre Payment",p -> safeAdd(p.getSellerForeclosurePaid(),p.getSellerPrepaymentPaid()));
         cols.put("Bounce Charges", p -> safeSubtract(p.getSellerTotalChargesPaid(), p.getSellerForeclosureChargesPaid()));
         cols.put("FC Charges", PartnerPayoutDetailsAll::getSellerForeclosureChargesPaid);
         cols.put("Closing Future POS (excluding Principal overdues).",  p -> safeSubtract(p.getSellerClosingPos(), safeSubtract(p.getSellerTotalPrincipalDue(),p.getSellerTotalPrincipalComponentPaid())));
         cols.put("Total Collections (EMI+Overdue+Part+F.C).", PartnerPayoutDetailsAll::getSellerTotalPaid);
-        // Closing Overdue Interest Need to find logic
+        cols.put("Closing Overdue Interest",p -> safeSubtract(p.getSellerTotalInterestDue(),p.getSellerTotalInterestComponentPaid()));
+        //  Need to find logic
 
         return cols;
     }
