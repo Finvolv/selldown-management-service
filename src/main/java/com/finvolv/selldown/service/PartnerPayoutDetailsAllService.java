@@ -898,9 +898,6 @@ public class PartnerPayoutDetailsAllService {
             return Mono.empty();
         }
         
-        // Get the denominator based on interest method
-        double denominator = getDenominatorForInterestMethod(interestMethod, startDate);
-        
         return interestRateChangeRepository.findByDealId(dealId)
             .collectList()
             .flatMap(rateTable -> {
@@ -935,12 +932,15 @@ public class PartnerPayoutDetailsAllService {
                     if (overlapDays > 0) {
                         double interestRate = entry.getInterestRate() != null ? entry.getInterestRate() : 0.0;
                         
-                        // Calculate interest for this period: baseAmount * rate * overlapDays / denominator
-                        // Respects the interest method (365, 360, etc.)
+                        // Calculate interest multiplier for this period using the interest method
+                        Double periodMultiplier = calculateInterestMultiplier(interestMethod, overlapStart, overlapEnd, overlapDays);
+                        
+                        // Calculate interest for this period: baseAmount * rate * multiplier
+                        // This uses the same logic as the main calculation
                         BigDecimal periodInterest = baseAmount
                             .multiply(BigDecimal.valueOf(interestRate))
-                            .multiply(BigDecimal.valueOf(overlapDays))
-                            .divide(BigDecimal.valueOf(denominator), 10, RoundingMode.HALF_UP);
+                            .multiply(BigDecimal.valueOf(periodMultiplier))
+                            .setScale(10, RoundingMode.HALF_UP);
                         
                         totalInterest = totalInterest.add(periodInterest);
                         totalOverlapDays += overlapDays;
@@ -951,10 +951,13 @@ public class PartnerPayoutDetailsAllService {
                 if (totalOverlapDays < totalDays && defaultRate != null) {
                     long uncoveredDays = totalDays - totalOverlapDays;
                     
+                    // Calculate interest multiplier for uncovered days using the interest method
+                    Double uncoveredMultiplier = calculateInterestMultiplier(interestMethod, startDate, endDate, uncoveredDays);
+                    
                     BigDecimal uncoveredInterest = baseAmount
                         .multiply(BigDecimal.valueOf(defaultRate))
-                        .multiply(BigDecimal.valueOf(uncoveredDays))
-                        .divide(BigDecimal.valueOf(denominator), 10, RoundingMode.HALF_UP);
+                        .multiply(BigDecimal.valueOf(uncoveredMultiplier))
+                        .setScale(10, RoundingMode.HALF_UP);
                     
                     totalInterest = totalInterest.add(uncoveredInterest);
                     logger.debug("Added interest for {} uncovered days using default rate {}: {}", uncoveredDays, defaultRate, uncoveredInterest);
@@ -968,31 +971,4 @@ public class PartnerPayoutDetailsAllService {
             });
     }
     
-    /**
-     * Get the denominator for interest calculation based on InterestMethod
-     */
-    private double getDenominatorForInterestMethod(Deal.InterestMethod interestMethod, LocalDate startDate) {
-        if (interestMethod == null) {
-            return 360.0; // Default
-        }
-        
-        switch (interestMethod) {
-            case ONE_TWELFTH:
-                // For ONE_TWELFTH, we use the multiplier approach, but denominator is not directly used
-                return 365.0; // Fallback
-                
-            case ACTUAL_BY_360:
-                return 360.0;
-                
-            case ACTUAL_BY_365:
-                return 365.0;
-                
-            case ACTUAL_BY_ACTUAL:
-                // Use 366 for leap year, 365 otherwise
-                return (startDate != null && startDate.isLeapYear()) ? 366.0 : 365.0;
-                
-            default:
-                return 360.0; // Default fallback
-        }
-    }
 }
