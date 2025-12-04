@@ -691,58 +691,155 @@ public class PartnerPayoutDetailsAllService {
             .filter(ld -> ld.getLmsLan() != null)
             .collect(Collectors.toMap(LoanDetail::getLmsLan, ld -> ld));
         
+        // Calculate previous month and year to check if we should look for previous month data
+        final Integer prevMonth;
+        final Integer prevYear;
+        
+        if (month == 1) {
+            prevMonth = 12;
+            prevYear = year - 1;
+        } else {
+            prevMonth = month - 1;
+            prevYear = year;
+        }
+        
+        // Get the previous month's lmsId to check if previous month data exists
+        logger.info("Checking for previous month data: year={}, month={}, prevYear={}, prevMonth={}", year, month, prevYear, prevMonth);
+        Mono<Long> prevMonthLmsIdMono = monthlyLMSStatusRepository.findByYearAndMonth(prevYear, prevMonth)
+            .map(MonthlyLMSStatusEntity::getId)
+            .doOnNext(lmsId -> logger.info("Found previous month LMS status with lmsId: {} for year={}, month={}", lmsId, prevYear, prevMonth))
+            .switchIfEmpty(Mono.defer(() -> {
+                logger.warn("No previous month LMS status found for year={}, month={}. This might be the first month.", prevYear, prevMonth);
+                return Mono.empty();
+            }));
+        
         // Process each payout detail reactively
-        return Flux.fromIterable(payoutDetails)
-            .filter(payout -> payout.getLmsLan() != null)
-            .flatMap(payout -> {
-                LoanDetail loanDetail = loanDetailMap.get(payout.getLmsLan());
-                if (loanDetail == null) {
-                    return Mono.just(OpeningPosDiscrepancy.builder()
-                        .lmsLan(payout.getLmsLan())
-                        .payoutOpeningPos(payout.getOpeningPos())
-                        .loanDetailOpeningPos(null)
-                        .difference(BigDecimal.ZERO)
-                        .isMismatch(false)
-                        .discrepancyType("NO_LOAN_DETAIL")
-                        .description("No loan detail found")
-                        .build());
-                }
-                
-                // Check if last cycle end date is present to determine which logic to use
-                if (payout.getLastCycleEndDate() != null) {
-                    
-                    return getPreviousMonthClosingPosReactive(payout.getLmsLan(), year, month)
-                        .map(prevClosingPos -> {
-                            BigDecimal expectedOpeningPos = prevClosingPos != null ? prevClosingPos : BigDecimal.ZERO;
+        return prevMonthLmsIdMono
+            .flatMap(prevLmsId -> {
+                // Fetch all previous month payout details once by lmsId
+                logger.info("Fetching all previous month payout details for lmsId: {}", prevLmsId);
+                return partnerPayoutDetailsAllRepository.findByLmsId(prevLmsId)
+                    .collectList()
+                    .map(prevMonthPayouts -> {
+                        // Create a map of lmsLan -> closingPos
+                        Map<String, BigDecimal> prevMonthClosingPosMap = new java.util.HashMap<>();
+                        for (PartnerPayoutDetailsAll payout : prevMonthPayouts) {
+                            if (payout.getLmsLan() != null && payout.getClosingPos() != null) {
+                                // Keep first if duplicates (don't overwrite)
+                                prevMonthClosingPosMap.putIfAbsent(payout.getLmsLan(), payout.getClosingPos());
+                            }
+                        }
+                        logger.info("Loaded {} previous month closing positions into map from {} payout records", 
+                            prevMonthClosingPosMap.size(), prevMonthPayouts.size());
+                        return prevMonthClosingPosMap;
+                    })
+                    .flatMap(prevMonthClosingPosMap -> {
+                        // Previous month data exists - check all payouts against previous month closing position
+                        logger.info("Previous month data found (lmsId: {}), checking opening positions against previous month closing positions for {} payouts", 
+                            prevLmsId, payoutDetails.size());
+                        
+                        List<OpeningPosDiscrepancy> discrepancies = new java.util.ArrayList<>();
+                        
+                        for (PartnerPayoutDetailsAll payout : payoutDetails) {
+                            if (payout.getLmsLan() == null) {
+                                continue;
+                            }
+                            
+                            LoanDetail loanDetail = loanDetailMap.get(payout.getLmsLan());
+                            if (loanDetail == null) {
+                                discrepancies.add(OpeningPosDiscrepancy.builder()
+                                    .lmsLan(payout.getLmsLan())
+                                    .payoutOpeningPos(payout.getOpeningPos())
+                                    .loanDetailOpeningPos(null)
+                                    .difference(BigDecimal.ZERO)
+                                    .isMismatch(false)
+                                    .discrepancyType("NO_LOAN_DETAIL")
+                                    .description("No loan detail found")
+                                    .build());
+                                continue;
+                            }
+                            
+                            // For 2nd month and later, always check previous month closing position vs current month opening position
+                            // Look up from the map we created
+                            BigDecimal prevClosingPos = prevMonthClosingPosMap.get(payout.getLmsLan());
+                            
+                            if (prevClosingPos == null) {
+                                // If no previous month data found for this LAN in month 2+, it's a data issue
+                                logger.warn("No previous month closing position found for LAN {} in map. Using ZERO as expected.", 
+                                    payout.getLmsLan());
+                                BigDecimal expectedOpeningPos = BigDecimal.ZERO;
+                                String discrepancyType = "PREVIOUS_MONTH_MISSING";
+                                String description = String.format("Previous month closing position not found for LAN %s. Expected opening position from previous month closing, but no previous month data exists.", payout.getLmsLan());
+                                boolean isMismatch = true; // This is a mismatch because we can't validate
+                                OpeningPosDiscrepancy discrepancy = processComparison(payout, expectedOpeningPos, discrepancyType, description, isMismatch);
+                                if (discrepancy.isMismatch()) {
+                                    discrepancies.add(discrepancy);
+                                }
+                                continue;
+                            }
+                            
+                            // Compare: Previous month's closing position (expected) vs Current month's opening position (actual)
+                            BigDecimal expectedOpeningPos = prevClosingPos;
                             String discrepancyType = "PREVIOUS_MONTH";
                             String description = "";
                             boolean isMismatch = false;
-                            return processComparison(payout, expectedOpeningPos, discrepancyType, description, isMismatch);
-                        })
-                        .flatMap(discrepancy -> discrepancy.isMismatch() ? Mono.just(discrepancy) : Mono.empty())
-                        .switchIfEmpty(Mono.fromCallable(() -> {
-                            // If no previous month data, use loan details
-                            BigDecimal expectedOpeningPos = loanDetail.getCurrentPOS() != null ?
-                                BigDecimal.valueOf(loanDetail.getCurrentPOS()) : BigDecimal.ZERO;
-                            String discrepancyType = "CURRENT_MONTH";
-                            String description = "";
-                            boolean isMismatch = false;
-                            return processComparison(payout, expectedOpeningPos, discrepancyType, description, isMismatch);
-                        }))
-                        .flatMap(discrepancy -> discrepancy.isMismatch() ? Mono.just(discrepancy) : Mono.empty());
-                } else {
-                    // If last cycle end date is NOT present, use loan details current position
-                    BigDecimal expectedOpeningPos = loanDetail.getCurrentPOS() != null ?
-                        BigDecimal.valueOf(loanDetail.getCurrentPOS()) : BigDecimal.ZERO;
-                    String discrepancyType = "CURRENT_MONTH";
-                    String description = "";
-                    boolean isMismatch = false;
-                    
-                    return Mono.fromCallable(() -> processComparison(payout, expectedOpeningPos, discrepancyType, description, isMismatch))
-                        .flatMap(discrepancy -> discrepancy.isMismatch() ? Mono.just(discrepancy) : Mono.empty());
-                }
+                            
+                            logger.debug("Comparing for LAN {}: Current opening={}, Previous closing={}", 
+                                payout.getLmsLan(), payout.getOpeningPos(), expectedOpeningPos);
+                            
+                            OpeningPosDiscrepancy discrepancy = processComparison(payout, expectedOpeningPos, discrepancyType, description, isMismatch);
+                            
+                            if (discrepancy.isMismatch()) {
+                                logger.warn("Opening position mismatch for LAN {}: Payout={}, Expected={}, Difference={}", 
+                                    discrepancy.getLmsLan(), discrepancy.getPayoutOpeningPos(), 
+                                    discrepancy.getLoanDetailOpeningPos(), discrepancy.getDifference());
+                                discrepancies.add(discrepancy);
+                            }
+                        }
+                        
+                        return Mono.just(discrepancies);
+                    });
             })
-            .collectList();
+            .switchIfEmpty(
+                // No previous month data exists - this is the first month, use loan details
+                Mono.fromCallable(() -> {
+                    List<OpeningPosDiscrepancy> discrepancies = new java.util.ArrayList<>();
+                    
+                    for (PartnerPayoutDetailsAll payout : payoutDetails) {
+                        if (payout.getLmsLan() == null) {
+                            continue;
+                        }
+                        
+                        LoanDetail loanDetail = loanDetailMap.get(payout.getLmsLan());
+                        if (loanDetail == null) {
+                            discrepancies.add(OpeningPosDiscrepancy.builder()
+                                .lmsLan(payout.getLmsLan())
+                                .payoutOpeningPos(payout.getOpeningPos())
+                                .loanDetailOpeningPos(null)
+                                .difference(BigDecimal.ZERO)
+                                .isMismatch(false)
+                                .discrepancyType("NO_LOAN_DETAIL")
+                                .description("No loan detail found")
+                                .build());
+                            continue;
+                        }
+                        
+                        // First month - use loan details current position
+                        BigDecimal expectedOpeningPos = loanDetail.getCurrentPOS() != null ?
+                            BigDecimal.valueOf(loanDetail.getCurrentPOS()) : BigDecimal.ZERO;
+                        String discrepancyType = "CURRENT_MONTH";
+                        String description = "";
+                        boolean isMismatch = false;
+                        
+                        OpeningPosDiscrepancy discrepancy = processComparison(payout, expectedOpeningPos, discrepancyType, description, isMismatch);
+                        if (discrepancy.isMismatch()) {
+                            discrepancies.add(discrepancy);
+                        }
+                    }
+                    
+                    return discrepancies;
+                })
+            );
     }
     
     private OpeningPosDiscrepancy processComparison(PartnerPayoutDetailsAll payout, BigDecimal expectedOpeningPos, 
@@ -795,32 +892,5 @@ public class PartnerPayoutDetailsAllService {
                 .build();
         }
     }
-    
-    
-    
-    /**
-     * Get the closing position from the previous month for a given LMS LAN (reactive)
-     */
-    private Mono<BigDecimal> getPreviousMonthClosingPosReactive(String lmsLan, Integer year, Integer month) {
-        // Calculate previous month and year
-        final Integer prevMonth;
-        final Integer prevYear;
-        
-        if (month == 1) {
-            prevMonth = 12;
-            prevYear = year - 1;
-        } else {
-            prevMonth = month - 1;
-            prevYear = year;
-        }
-        
-        // Find the payout detail for the previous month
-        return partnerPayoutDetailsAllRepository.findByLmsLanAndYearAndMonth(lmsLan, prevYear, prevMonth)
-            .map(PartnerPayoutDetailsAll::getClosingPos)
-            .next() // Get the first result
-            .onErrorResume(error -> Mono.empty()) // Return empty if error
-            .switchIfEmpty(Mono.empty()); // Return empty if no results found
-    }
 
-   
 }
