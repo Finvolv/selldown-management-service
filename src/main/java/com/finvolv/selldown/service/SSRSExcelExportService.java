@@ -163,6 +163,18 @@ public class SSRSExcelExportService {
                 int colDiff = 14; // P
                 int colOverdueCheck = 15; // Q
                 int colPrincipalRemarks = 16; // R
+                int colEmpty1 = 17; // S - Empty column
+                int colEmpty2 = 18; // T - Empty column
+                // First set of 4 columns for Bounce Charges
+                int colPlFtmInstructBounceCharges90 = 19; // U - Bounce charges DA
+                int colPayoutBounceCharges = 20; // V - Payout Bounce Charges
+                int colDiffBounceCharges = 21; // W - Diff bounce charges
+                int colRemarksBounceCharges = 22; // X - Remarks bounce charges
+                // Second set of 4 columns for Foreclosure Charges
+                int colPlFtmForeclosureCharges90 = 23; // Y - Foreclosure charges DA
+                int colPayoutForeclosureCharges = 24; // Z - Payout foreclosure charges
+                int colDiffForeclosureCharges = 25; // AA - Diff Foreclosure charges
+                int colRemarksForeclosureCharges = 26; // AB - Remarks Foreclosure charges
 
                 // SUM row formulas (row 0)
                 sumRow.createCell(colLAN).setCellValue("SUM");
@@ -182,6 +194,19 @@ public class SSRSExcelExportService {
                 setSumFormula(sumRow, colDiff, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colOverdueCheck, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colBSFtmBeginningPR90, dataStartRow, dataEndRow);
+                // Empty columns
+                sumRow.createCell(colEmpty1).setCellValue("");
+                sumRow.createCell(colEmpty2).setCellValue("");
+                // Bounce Charges columns
+                setSumFormula(sumRow, colPlFtmInstructBounceCharges90, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colPayoutBounceCharges, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colDiffBounceCharges, dataStartRow, dataEndRow);
+                sumRow.createCell(colRemarksBounceCharges).setCellValue("");
+                // Foreclosure Charges columns
+                setSumFormula(sumRow, colPlFtmForeclosureCharges90, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colPayoutForeclosureCharges, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colDiffForeclosureCharges, dataStartRow, dataEndRow);
+                sumRow.createCell(colRemarksForeclosureCharges).setCellValue("");
 
                 // Header row (row 1) - set height for text wrapping and more space
                 Row header = sheet.createRow(1);
@@ -254,6 +279,49 @@ public class SSRSExcelExportService {
                 Cell principalRemarksHeader = header.createCell(colPrincipalRemarks);
                 principalRemarksHeader.setCellValue("Principal Remarks");
                 principalRemarksHeader.setCellStyle(sandalHeaderStyle);
+                
+                // Empty columns
+                Cell empty1Header = header.createCell(colEmpty1);
+                empty1Header.setCellValue("");
+                empty1Header.setCellStyle(sandalHeaderStyle);
+                
+                Cell empty2Header = header.createCell(colEmpty2);
+                empty2Header.setCellValue("");
+                empty2Header.setCellStyle(sandalHeaderStyle);
+                
+                // First set: Bounce Charges columns
+                Cell plFtmInstructBounceCharges90Header = header.createCell(colPlFtmInstructBounceCharges90);
+                plFtmInstructBounceCharges90Header.setCellValue("Bounce charges DA");
+                plFtmInstructBounceCharges90Header.setCellStyle(sandalHeaderStyle);
+                
+                Cell payoutBounceChargesHeader = header.createCell(colPayoutBounceCharges);
+                payoutBounceChargesHeader.setCellValue("Payout Bounce Charges");
+                payoutBounceChargesHeader.setCellStyle(blueHeaderStyle);
+                
+                Cell diffBounceChargesHeader = header.createCell(colDiffBounceCharges);
+                diffBounceChargesHeader.setCellValue("Diff bounce charges");
+                diffBounceChargesHeader.setCellStyle(sandalHeaderStyle);
+                
+                Cell remarksBounceChargesHeader = header.createCell(colRemarksBounceCharges);
+                remarksBounceChargesHeader.setCellValue("Remarks");
+                remarksBounceChargesHeader.setCellStyle(sandalHeaderStyle);
+                
+                // Second set: Foreclosure Charges columns
+                Cell plFtmForeclosureCharges90Header = header.createCell(colPlFtmForeclosureCharges90);
+                plFtmForeclosureCharges90Header.setCellValue("Foreclosure charges DA");
+                plFtmForeclosureCharges90Header.setCellStyle(sandalHeaderStyle);
+                
+                Cell payoutForeclosureChargesHeader = header.createCell(colPayoutForeclosureCharges);
+                payoutForeclosureChargesHeader.setCellValue("Payout foreclosure charges");
+                payoutForeclosureChargesHeader.setCellStyle(blueHeaderStyle);
+                
+                Cell diffForeclosureChargesHeader = header.createCell(colDiffForeclosureCharges);
+                diffForeclosureChargesHeader.setCellValue("Diff Foreclosure charges");
+                diffForeclosureChargesHeader.setCellStyle(sandalHeaderStyle);
+                
+                Cell remarksForeclosureChargesHeader = header.createCell(colRemarksForeclosureCharges);
+                remarksForeclosureChargesHeader.setCellValue("Remarks");
+                remarksForeclosureChargesHeader.setCellStyle(sandalHeaderStyle);
 
                 // Data rows (starting from row 2)
                 int rowIdx = dataStartRow;
@@ -397,6 +465,88 @@ public class SSRSExcelExportService {
                     principalRemarksCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffCol, rowIdx + 1));
                     principalRemarksCell.setCellStyle(centerDataStyle);
                     
+                    // Empty columns
+                    Cell empty1Cell = row.createCell(colEmpty1);
+                    empty1Cell.setCellValue("");
+                    empty1Cell.setCellStyle(sandalDataStyle);
+                    
+                    Cell empty2Cell = row.createCell(colEmpty2);
+                    empty2Cell.setCellValue("");
+                    empty2Cell.setCellStyle(sandalDataStyle);
+                    
+                    // First set: Bounce Charges columns
+                    // Bounce charges DA (sandal, right-aligned)
+                    Cell plFtmInstructBounceCharges90Cell = row.createCell(colPlFtmInstructBounceCharges90);
+                    Object plFtmInstructBounceCharges90Value = getMetadataValue(ssrs, "plFtmInstructBounceCharges90");
+                    setNumericCellValue(plFtmInstructBounceCharges90Cell, plFtmInstructBounceCharges90Value);
+                    plFtmInstructBounceCharges90Cell.setCellStyle(sandalDataStyle);
+                    
+                    // Payout Bounce Charges (blue, right-aligned) - sellerTotalChargesPaid - sellerForeclosureChargesPaid - sellerPrepaymentPaid
+                    Cell payoutBounceChargesCell = row.createCell(colPayoutBounceCharges);
+                    if (payout != null) {
+                        BigDecimal payoutBounceCharges = safeSubtract(
+                            safeSubtract(
+                                payout.getSellerTotalChargesPaid(),
+                                payout.getSellerForeclosureChargesPaid()
+                            ),
+                            payout.getSellerPrepaymentChargesPaid()
+                        );
+                        setNumericCellValue(payoutBounceChargesCell, payoutBounceCharges);
+                    } else {
+                        payoutBounceChargesCell.setCellValue(0);
+                    }
+                    payoutBounceChargesCell.setCellStyle(blueDataStyle);
+                    
+                    // Diff bounce charges (sandal, right-aligned, formula)
+                    Cell diffBounceChargesCell = row.createCell(colDiffBounceCharges);
+                    String plFtmInstructBounceCharges90Col = getColumnLetter(colPlFtmInstructBounceCharges90);
+                    String payoutBounceChargesCol = getColumnLetter(colPayoutBounceCharges);
+                    diffBounceChargesCell.setCellFormula(String.format("%s%d-%s%d", 
+                        plFtmInstructBounceCharges90Col, rowIdx + 1, payoutBounceChargesCol, rowIdx + 1));
+                    diffBounceChargesCell.setCellStyle(sandalDataStyle);
+                    
+                    // Remarks bounce charges (centered text, based on Diff)
+                    Cell remarksBounceChargesCell = row.createCell(colRemarksBounceCharges);
+                    String diffBounceChargesCol = getColumnLetter(colDiffBounceCharges);
+                    remarksBounceChargesCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffBounceChargesCol, rowIdx + 1));
+                    remarksBounceChargesCell.setCellStyle(centerDataStyle);
+                    
+                    // Second set: Foreclosure Charges columns
+                    // Foreclosure charges DA (sandal, right-aligned)
+                    Cell plFtmForeclosureCharges90Cell = row.createCell(colPlFtmForeclosureCharges90);
+                    Object plFtmForeclosureCharges90Value = getMetadataValue(ssrs, "plFtmForeclosureCharges90");
+                    setNumericCellValue(plFtmForeclosureCharges90Cell, plFtmForeclosureCharges90Value);
+                    plFtmForeclosureCharges90Cell.setCellStyle(sandalDataStyle);
+                    
+                    // Payout foreclosure charges (blue, right-aligned) - sellerForeclosureChargesPaid
+                    // If sellerClosingPos == 0, add sellerPrepaymentPaid, otherwise just sellerForeclosureChargesPaid
+                    Cell payoutForeclosureChargesCell = row.createCell(colPayoutForeclosureCharges);
+                    if (payout != null && payout.getSellerForeclosureChargesPaid() != null) {
+                        BigDecimal foreclosureCharges = payout.getSellerForeclosureChargesPaid();
+                        // Only add sellerPrepaymentPaid if sellerClosingPos == 0
+                        if (payout.getSellerClosingPos() != null && payout.getSellerClosingPos().compareTo(BigDecimal.ZERO) == 0) {
+                            foreclosureCharges = safeAdd(foreclosureCharges, payout.getSellerPrepaymentPaid());
+                        }
+                        setNumericCellValue(payoutForeclosureChargesCell, foreclosureCharges);
+                    } else {
+                        payoutForeclosureChargesCell.setCellValue(0);
+                    }
+                    payoutForeclosureChargesCell.setCellStyle(blueDataStyle);
+                    
+                    // Diff Foreclosure charges (sandal, right-aligned, formula)
+                    Cell diffForeclosureChargesCell = row.createCell(colDiffForeclosureCharges);
+                    String plFtmForeclosureCharges90Col = getColumnLetter(colPlFtmForeclosureCharges90);
+                    String payoutForeclosureChargesCol = getColumnLetter(colPayoutForeclosureCharges);
+                    diffForeclosureChargesCell.setCellFormula(String.format("%s%d-%s%d", 
+                        plFtmForeclosureCharges90Col, rowIdx + 1, payoutForeclosureChargesCol, rowIdx + 1));
+                    diffForeclosureChargesCell.setCellStyle(sandalDataStyle);
+                    
+                    // Remarks Foreclosure charges (centered text, based on Diff)
+                    Cell remarksForeclosureChargesCell = row.createCell(colRemarksForeclosureCharges);
+                    String diffForeclosureChargesCol = getColumnLetter(colDiffForeclosureCharges);
+                    remarksForeclosureChargesCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffForeclosureChargesCol, rowIdx + 1));
+                    remarksForeclosureChargesCell.setCellStyle(centerDataStyle);
+                    
                     rowIdx++;
                 }
 
@@ -418,6 +568,19 @@ public class SSRSExcelExportService {
                 sheet.setColumnWidth(colDiff, 5000); // More spacious for Diff
                 sheet.setColumnWidth(colOverdueCheck, 6000); // More spacious for Overdue check
                 sheet.setColumnWidth(colPrincipalRemarks, 6000); // More spacious for Principal Remarks
+                // Empty columns
+                sheet.setColumnWidth(colEmpty1, 3000);
+                sheet.setColumnWidth(colEmpty2, 3000);
+                // Bounce Charges columns
+                sheet.setColumnWidth(colPlFtmInstructBounceCharges90, 6000);
+                sheet.setColumnWidth(colPayoutBounceCharges, 6000);
+                sheet.setColumnWidth(colDiffBounceCharges, 5000);
+                sheet.setColumnWidth(colRemarksBounceCharges, 5000);
+                // Foreclosure Charges columns
+                sheet.setColumnWidth(colPlFtmForeclosureCharges90, 6500);
+                sheet.setColumnWidth(colPayoutForeclosureCharges, 6000);
+                sheet.setColumnWidth(colDiffForeclosureCharges, 5000);
+                sheet.setColumnWidth(colRemarksForeclosureCharges, 5000);
 
                 // Sheet 2: Interest Validations
                 createInterestValidationsSheet(workbook, ssrsData, payoutMap, deal, year, month);
