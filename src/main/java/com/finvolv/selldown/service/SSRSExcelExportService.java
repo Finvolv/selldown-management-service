@@ -794,23 +794,23 @@ public class SSRSExcelExportService {
             lanCell.setCellValue(ssrs.getLmsLan() != null ? ssrs.getLmsLan() : "");
             lanCell.setCellStyle(greenDataStyle);
             
-            // Opening Future Principal (green, right-aligned) - sellerOpeningPos - sellerPrincipalOverdue
+            // Opening Future Principal (green, right-aligned) - bsItdBeginningLoanBalance90
             Cell openingFuturePrincipalCell = row.createCell(colOpeningFuturePrincipal);
+            Object afValue = getMetadataValue(ssrs, "bsItdBeginningLoanBalance90");
+            setNumericCellValue(openingFuturePrincipalCell, afValue);
+            openingFuturePrincipalCell.setCellStyle(greenDataStyle);
+            
+            // AF (sandal, right-aligned) - sellerOpeningPos - sellerPrincipalOverdue
+            Cell afCell = row.createCell(colAF);
             if (payout != null) {
                 BigDecimal openingFuturePrincipal = safeSubtract(
                     payout.getSellerOpeningPos(),
                     payout.getSellerPrincipalOverdue()
                 );
-                setNumericCellValue(openingFuturePrincipalCell, openingFuturePrincipal);
+                setNumericCellValue(afCell, openingFuturePrincipal);
             } else {
-                openingFuturePrincipalCell.setCellValue(0);
+                afCell.setCellValue(0);
             }
-            openingFuturePrincipalCell.setCellStyle(greenDataStyle);
-            
-            // AF (sandal, right-aligned) - bsItdBeginningLoanBalance90
-            Cell afCell = row.createCell(colAF);
-            Object afValue = getMetadataValue(ssrs, "bsItdBeginningLoanBalance90");
-            setNumericCellValue(afCell, afValue);
             afCell.setCellStyle(sandalDataStyle);
             
             // Diff (sandal, right-aligned, formula) - Opening Future Principal - AF
