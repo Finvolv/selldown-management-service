@@ -69,7 +69,7 @@ public class SSRSExcelExportService {
 
             try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                 // Sheet 1: Main reconciliation sheet
-                Sheet sheet = workbook.createSheet("Sheet1");
+                Sheet sheet = workbook.createSheet("POS Validation Working Sheet + Charges");
 
                 // Create color styles with exact colors matching the image
                 XSSFFont boldFont = workbook.createFont();
@@ -148,16 +148,21 @@ public class SSRSExcelExportService {
                 // Column indices
                 int colLAN = 0; // B (0-indexed, but Excel shows as B)
                 int colStatus = 1; // C
-                int colBSITDEnd = 2; // D
-                int colPrincipalDA = 3; // E
-                int colVDPR = 4; // F
-                int colTotalVD = 5; // G
-                int colPayoutReport = 6; // H
-                int colOverduePR = 7; // I
-                int colPartPaymentFC = 8; // J
-                int colTotalPayout = 9; // K
-                int colDiff = 10; // L
-                int colOverdueCheck = 11; // M
+                int colBSFtmBeginningPR90 = 2; // D - BS OPENING Principle receivable 90%
+                int colBSITDEnd = 3; // E
+                int colPrincipalDA = 4; // F
+                int colVDPR = 5; // G
+                int colPLFtmDebt90 = 6; // H
+                int colPLFtmBadDebtRecovery90 = 7; // I
+                int colPLFtmSettlementLoss90 = 8; // J
+                int colTotalVD = 9; // K
+                int colPayoutReport = 10; // L
+                int colOverduePR = 11; // M
+                int colPartPaymentFC = 12; // N
+                int colTotalPayout = 13; // O
+                int colDiff = 14; // P
+                int colOverdueCheck = 15; // Q
+                int colPrincipalRemarks = 16; // R
 
                 // SUM row formulas (row 0)
                 sumRow.createCell(colLAN).setCellValue("SUM");
@@ -166,6 +171,9 @@ public class SSRSExcelExportService {
                 setSumFormula(sumRow, colBSITDEnd, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colPrincipalDA, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colVDPR, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colPLFtmDebt90, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colPLFtmBadDebtRecovery90, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colPLFtmSettlementLoss90, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colTotalVD, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colPayoutReport, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colOverduePR, dataStartRow, dataEndRow);
@@ -173,6 +181,7 @@ public class SSRSExcelExportService {
                 setSumFormula(sumRow, colTotalPayout, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colDiff, dataStartRow, dataEndRow);
                 setSumFormula(sumRow, colOverdueCheck, dataStartRow, dataEndRow);
+                setSumFormula(sumRow, colBSFtmBeginningPR90, dataStartRow, dataEndRow);
 
                 // Header row (row 1) - set height for text wrapping and more space
                 Row header = sheet.createRow(1);
@@ -183,8 +192,12 @@ public class SSRSExcelExportService {
                 lanHeader.setCellStyle(greenHeaderStyle);
                 
                 Cell statusHeader = header.createCell(colStatus);
-                statusHeader.setCellValue("Status Active Closed");
+                statusHeader.setCellValue("Status");
                 statusHeader.setCellStyle(blueHeaderStyle);
+                
+                Cell bsFtmBeginningPRHeader = header.createCell(colBSFtmBeginningPR90);
+                bsFtmBeginningPRHeader.setCellValue("BS  OPENING Principle receivable 90%");
+                bsFtmBeginningPRHeader.setCellStyle(blueHeaderStyle);
                 
                 Cell bsItdHeader = header.createCell(colBSITDEnd);
                 bsItdHeader.setCellValue("BS ITD End Principle receivable 90%");
@@ -197,6 +210,18 @@ public class SSRSExcelExportService {
                 Cell vdprHeader = header.createCell(colVDPR);
                 vdprHeader.setCellValue("VD PR");
                 vdprHeader.setCellStyle(sandalHeaderStyle);
+
+                Cell plFtmDebt90Header = header.createCell(colPLFtmDebt90);
+                plFtmDebt90Header.setCellValue("PL FTM Bad Debt 90");
+                plFtmDebt90Header.setCellStyle(sandalHeaderStyle);
+
+                Cell plFtmBadDebtRecovery90Header = header.createCell(colPLFtmBadDebtRecovery90);
+                plFtmBadDebtRecovery90Header.setCellValue("PL FTM Bad Debt Recovery 90");
+                plFtmBadDebtRecovery90Header.setCellStyle(sandalHeaderStyle);
+
+                Cell plFtmSettlementLoss90Header = header.createCell(colPLFtmSettlementLoss90);
+                plFtmSettlementLoss90Header.setCellValue("PL FTM Settlement Loss 90");
+                plFtmSettlementLoss90Header.setCellStyle(sandalHeaderStyle);
                 
                 Cell totalVDHeader = header.createCell(colTotalVD);
                 totalVDHeader.setCellValue("Total VD");
@@ -226,6 +251,10 @@ public class SSRSExcelExportService {
                 overdueCheckHeader.setCellValue("Overdue check");
                 overdueCheckHeader.setCellStyle(sandalHeaderStyle);
 
+                Cell principalRemarksHeader = header.createCell(colPrincipalRemarks);
+                principalRemarksHeader.setCellValue("Principal Remarks");
+                principalRemarksHeader.setCellStyle(sandalHeaderStyle);
+
                 // Data rows (starting from row 2)
                 int rowIdx = dataStartRow;
                 for (SSRSFileDataEntity ssrs : ssrsData) {
@@ -244,6 +273,12 @@ public class SSRSExcelExportService {
                     statusCell.setCellValue(statusOfLoan != null ? statusOfLoan.toString() : "");
                     statusCell.setCellStyle(centerDataStyle);
                     
+                    // BS OPENING Principle receivable 90% (blue, right-aligned numbers)
+                    Cell bsFtmBeginningPRCell = row.createCell(colBSFtmBeginningPR90);
+                    Object bsFtmBeginningPRValue = getMetadataValue(ssrs, "bsftmBeginningPrincipleReceivable90");
+                    setNumericCellValue(bsFtmBeginningPRCell, bsFtmBeginningPRValue);
+                    bsFtmBeginningPRCell.setCellStyle(blueDataStyle);
+                    
                     // BS ITD End Principle receivable 90% (blue, right-aligned numbers)
                     Cell bsItdCell = row.createCell(colBSITDEnd);
                     Object bsItdValue = getMetadataValue(ssrs, "bsItdEndPrincipleReceivable90");
@@ -261,20 +296,46 @@ public class SSRSExcelExportService {
                     Object vdprValue = getMetadataValue(ssrs, "bsFtmPrincipleReceivable90");
                     setNumericCellValue(vdprCell, vdprValue);
                     vdprCell.setCellStyle(sandalDataStyle);
+
+                    // PL FTM Bad Debt 90 (sandal, right-aligned numbers)
+                    Cell plFtmDebt90Cell = row.createCell(colPLFtmDebt90);
+                    Object plFtmDebt90Value = getMetadataValue(ssrs, "plFtmDebt90");
+                    setNumericCellValue(plFtmDebt90Cell, plFtmDebt90Value);
+                    plFtmDebt90Cell.setCellStyle(sandalDataStyle);
+
+                    // PL FTM Bad Debt Recovery 90 (sandal, right-aligned numbers)
+                    Cell plFtmBadDebtRecovery90Cell = row.createCell(colPLFtmBadDebtRecovery90);
+                    Object plFtmBadDebtRecovery90Value = getMetadataValue(ssrs, "plFtmBadDebtRecovery90");
+                    setNumericCellValue(plFtmBadDebtRecovery90Cell, plFtmBadDebtRecovery90Value);
+                    plFtmBadDebtRecovery90Cell.setCellStyle(sandalDataStyle);
+
+                    // PL FTM Settlement Loss 90 (sandal, right-aligned numbers)
+                    Cell plFtmSettlementLoss90Cell = row.createCell(colPLFtmSettlementLoss90);
+                    Object plFtmSettlementLoss90Value = getMetadataValue(ssrs, "plFtmSettlementLoss90");
+                    setNumericCellValue(plFtmSettlementLoss90Cell, plFtmSettlementLoss90Value);
+                    plFtmSettlementLoss90Cell.setCellStyle(sandalDataStyle);
                     
                     // Total VD (sandal, right-aligned, formula)
                     Cell totalVDCell = row.createCell(colTotalVD);
                     String principalDACol = getColumnLetter(colPrincipalDA);
                     String vdprCol = getColumnLetter(colVDPR);
-                    totalVDCell.setCellFormula(String.format("%s%d+%s%d", principalDACol, rowIdx + 1, vdprCol, rowIdx + 1));
+                    String plFtmDebt90Col = getColumnLetter(colPLFtmDebt90);
+                    String plFtmBadDebtRecovery90Col = getColumnLetter(colPLFtmBadDebtRecovery90);
+                    String plFtmSettlementLoss90Col = getColumnLetter(colPLFtmSettlementLoss90);
+                    totalVDCell.setCellFormula(String.format("%s%d+%s%d+%s%d+%s%d+%s%d",
+                            principalDACol, rowIdx + 1,
+                            vdprCol, rowIdx + 1,
+                            plFtmDebt90Col, rowIdx + 1,
+                            plFtmBadDebtRecovery90Col, rowIdx + 1,
+                            plFtmSettlementLoss90Col, rowIdx + 1));
                     totalVDCell.setCellStyle(sandalDataStyle);
                     
                     // Payout Report (blue, right-aligned numbers)
                     Cell payoutReportCell = row.createCell(colPayoutReport);
                     if (payout != null) {
                         BigDecimal payoutReport = safeSubtract(
-                            payout.getTotalPrincipalComponentPaid(),
-                            payout.getPrincipalOverduePaid()
+                            payout.getSellerTotalPrincipalComponentPaid(),
+                            payout.getSellerPrincipalOverduePaid()
                         );
                         setNumericCellValue(payoutReportCell, payoutReport);
                     } else {
@@ -284,8 +345,8 @@ public class SSRSExcelExportService {
                     
                     // Overdue PR (blue, right-aligned numbers)
                     Cell overduePRCell = row.createCell(colOverduePR);
-                    if (payout != null && payout.getPrincipalOverduePaid() != null) {
-                        setNumericCellValue(overduePRCell, payout.getPrincipalOverduePaid());
+                    if (payout != null && payout.getSellerPrincipalOverduePaid() != null) {
+                        setNumericCellValue(overduePRCell, payout.getSellerPrincipalOverduePaid());
                     } else {
                         overduePRCell.setCellValue(0);
                     }
@@ -295,8 +356,8 @@ public class SSRSExcelExportService {
                     Cell partPaymentFCCell = row.createCell(colPartPaymentFC);
                     if (payout != null) {
                         BigDecimal partPaymentFC = safeAdd(
-                            payout.getPrepaymentPaid(),
-                            payout.getForeclosurePaid()
+                            payout.getSellerPrepaymentPaid(),
+                            payout.getSellerForeclosurePaid()
                         );
                         setNumericCellValue(partPaymentFCCell, partPaymentFC);
                     } else {
@@ -322,12 +383,19 @@ public class SSRSExcelExportService {
                     
                     // Overdue check (sandal, right-aligned, formula with conditional formatting for negative)
                     Cell overdueCheckCell = row.createCell(colOverdueCheck);
-                    String bsItdCol = getColumnLetter(colBSITDEnd);
+                    String bsFtmBeginningPRCol = getColumnLetter(colBSFtmBeginningPR90);
                     String overduePRColForCheck = getColumnLetter(colOverduePR);
-                    overdueCheckCell.setCellFormula(String.format("%s%d-%s%d", bsItdCol, rowIdx + 1, overduePRColForCheck, rowIdx + 1));
+                    // Formula: BS OPENING Principle receivable 90% - Overdue PR
+                    overdueCheckCell.setCellFormula(String.format("%s%d-%s%d", bsFtmBeginningPRCol, rowIdx + 1, overduePRColForCheck, rowIdx + 1));
                     // Note: Conditional formatting for negative values would need to be applied via Excel's conditional formatting feature
                     // For now, we'll use sandal style, but the formula will show negative values
                     overdueCheckCell.setCellStyle(sandalDataStyle);
+
+                    // Principal Remarks (centered text, based on Diff)
+                    Cell principalRemarksCell = row.createCell(colPrincipalRemarks);
+                    String diffCol = getColumnLetter(colDiff);
+                    principalRemarksCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffCol, rowIdx + 1));
+                    principalRemarksCell.setCellStyle(centerDataStyle);
                     
                     rowIdx++;
                 }
@@ -335,9 +403,13 @@ public class SSRSExcelExportService {
                 // Set column widths to be more spacious
                 sheet.setColumnWidth(colLAN, 4500); // More spacious for LAN
                 sheet.setColumnWidth(colStatus, 5500); // More spacious for Status
+                sheet.setColumnWidth(colBSFtmBeginningPR90, 7000); // Wider for long header
                 sheet.setColumnWidth(colBSITDEnd, 7000); // Much wider for long header
                 sheet.setColumnWidth(colPrincipalDA, 5500); // More spacious
                 sheet.setColumnWidth(colVDPR, 5000); // More spacious
+                sheet.setColumnWidth(colPLFtmDebt90, 6000); // More spacious
+                sheet.setColumnWidth(colPLFtmBadDebtRecovery90, 6500); // More spacious
+                sheet.setColumnWidth(colPLFtmSettlementLoss90, 6500); // More spacious
                 sheet.setColumnWidth(colTotalVD, 5500); // More spacious
                 sheet.setColumnWidth(colPayoutReport, 6000); // More spacious
                 sheet.setColumnWidth(colOverduePR, 5500); // More spacious
@@ -345,6 +417,7 @@ public class SSRSExcelExportService {
                 sheet.setColumnWidth(colTotalPayout, 5500); // More spacious
                 sheet.setColumnWidth(colDiff, 5000); // More spacious for Diff
                 sheet.setColumnWidth(colOverdueCheck, 6000); // More spacious for Overdue check
+                sheet.setColumnWidth(colPrincipalRemarks, 6000); // More spacious for Principal Remarks
 
                 // Sheet 2: Interest Validations
                 createInterestValidationsSheet(workbook, ssrsData, payoutMap, deal, year, month);
