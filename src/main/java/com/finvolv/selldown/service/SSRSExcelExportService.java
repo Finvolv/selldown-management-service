@@ -1,8 +1,10 @@
 package com.finvolv.selldown.service;
 
 import com.finvolv.selldown.model.Deal;
+import com.finvolv.selldown.model.InterestRateChange;
 import com.finvolv.selldown.model.PartnerPayoutDetailsAll;
 import com.finvolv.selldown.model.SSRSFileDataEntity;
+import com.finvolv.selldown.repository.InterestRateChangeRepository;
 import com.finvolv.selldown.repository.MonthlyLMSStatusRepository;
 import com.finvolv.selldown.repository.PartnerPayoutDetailsAllRepository;
 import com.finvolv.selldown.service.PartnerPayoutDetailsAllService;
@@ -20,6 +22,8 @@ import reactor.core.publisher.Mono;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -30,13 +34,16 @@ public class SSRSExcelExportService {
     private final PartnerPayoutDetailsAllRepository partnerPayoutDetailsAllRepository;
     private final MonthlyLMSStatusRepository monthlyLMSStatusRepository;
     private final PartnerPayoutDetailsAllService partnerPayoutDetailsAllService;
+    private final InterestRateChangeRepository interestRateChangeRepository;
 
     public SSRSExcelExportService(PartnerPayoutDetailsAllRepository partnerPayoutDetailsAllRepository,
                                  MonthlyLMSStatusRepository monthlyLMSStatusRepository,
-                                 PartnerPayoutDetailsAllService partnerPayoutDetailsAllService) {
+                                 PartnerPayoutDetailsAllService partnerPayoutDetailsAllService,
+                                 InterestRateChangeRepository interestRateChangeRepository) {
         this.partnerPayoutDetailsAllRepository = partnerPayoutDetailsAllRepository;
         this.monthlyLMSStatusRepository = monthlyLMSStatusRepository;
         this.partnerPayoutDetailsAllService = partnerPayoutDetailsAllService;
+        this.interestRateChangeRepository = interestRateChangeRepository;
     }
 
     public Mono<byte[]> buildSSRSReport(List<SSRSFileDataEntity> ssrsData, Integer year, Integer month, Long dealId) {
@@ -46,6 +53,10 @@ public class SSRSExcelExportService {
             : Mono.just(null);
         
         // Fetch payout data for the same year and month via lmsId
+        Mono<List<InterestRateChange>> interestRateChangesMono = dealId != null
+            ? interestRateChangeRepository.findByDealId(dealId).collectList()
+            : Mono.just(java.util.Collections.<InterestRateChange>emptyList());
+        
         return Mono.zip(
             dealMono,
             monthlyLMSStatusRepository.findByYearAndMonth(year, month)
@@ -53,11 +64,13 @@ public class SSRSExcelExportService {
                     partnerPayoutDetailsAllRepository.findByLmsId(lmsStatus.getId())
                 )
                 .collectList()
-                .switchIfEmpty(Mono.just(java.util.Collections.<PartnerPayoutDetailsAll>emptyList()))
+                .switchIfEmpty(Mono.just(java.util.Collections.<PartnerPayoutDetailsAll>emptyList())),
+            interestRateChangesMono
         )
         .map(tuple -> {
             Deal deal = tuple.getT1();
             List<PartnerPayoutDetailsAll> payoutDataList = tuple.getT2();
+            List<InterestRateChange> interestRateChanges = tuple.getT3();
             // Create a map of payout data by lmsLan for quick lookup
             Map<String, PartnerPayoutDetailsAll> payoutMap = payoutDataList.stream()
                 .filter(p -> p.getLmsLan() != null)
@@ -579,7 +592,7 @@ public class SSRSExcelExportService {
                 sheet.setColumnWidth(colRemarksForeclosureCharges, 5000);
 
                 // Sheet 2: Interest Validations
-                createInterestValidationsSheet(workbook, ssrsData, payoutMap, deal, year, month);
+                createInterestValidationsSheet(workbook, ssrsData, payoutMap, deal, year, month, interestRateChanges);
 
                 workbook.write(out);
                 return out.toByteArray();
@@ -659,9 +672,87 @@ public class SSRSExcelExportService {
         return columnLetter.toString();
     }
 
+    /**
+     * Generate Excel formula for FTP Interest DA based on interest rate changes
+     * Formula format: ((Opening Future Principal * Rate1) / 365 * Days1) + ((Opening Future Principal * Rate2) / 365 * Days2) + ...
+     */
+    private String generateFTPInterestDAFormula(String openingFuturePrincipalCol, int rowNum, 
+                                                LocalDate cycleStartDate, LocalDate cycleEndDate, 
+                                                List<InterestRateChange> interestRateChanges, Double defaultRate) {
+        if (cycleStartDate == null || cycleEndDate == null) {
+            return "0";
+        }
+        
+        long totalDays = ChronoUnit.DAYS.between(cycleStartDate, cycleEndDate);
+        if (totalDays <= 0) {
+            return "0";
+        }
+        
+        java.util.List<String> formulaParts = new java.util.ArrayList<>();
+        
+        if (interestRateChanges == null || interestRateChanges.isEmpty()) {
+            // No rate changes, use default rate
+            if (defaultRate != null) {
+                String noOfDaysCol = getColumnLetter(getNoOfDaysColumnIndex());
+                return String.format("((%s%d*%.6f)/365*%s%d)", openingFuturePrincipalCol, rowNum, defaultRate, noOfDaysCol, rowNum);
+            }
+            return "0";
+        }
+        
+        long totalOverlapDays = 0;
+        
+        for (InterestRateChange entry : interestRateChanges) {
+            LocalDate rateStart = entry.getStartDate();
+            if (rateStart == null) {
+                continue;
+            }
+            
+            LocalDate rateEnd = entry.getEndDate() != null ? entry.getEndDate() : LocalDate.MAX;
+            
+            // Calculate overlap between cycle period and rate period
+            LocalDate overlapStart = rateStart.isAfter(cycleStartDate) ? rateStart : cycleStartDate;
+            LocalDate overlapEnd = rateEnd.isBefore(cycleEndDate) ? rateEnd : cycleEndDate;
+            
+            if (overlapStart.isAfter(overlapEnd)) {
+                continue;
+            }
+            
+            long overlapDays = ChronoUnit.DAYS.between(overlapStart, overlapEnd);
+            
+            if (overlapDays > 0) {
+                double interestRate = entry.getInterestRate() != null ? entry.getInterestRate() : 0.0;
+                
+                // Formula part: ((Opening Future Principal * Rate) / 365 * Days)
+                String formulaPart = String.format("((%s%d*%.6f)/365*%d)", 
+                    openingFuturePrincipalCol, rowNum, interestRate, overlapDays);
+                formulaParts.add(formulaPart);
+                totalOverlapDays += overlapDays;
+            }
+        }
+        
+        // If there are gaps in rate coverage, use default rate for uncovered days
+        if (totalOverlapDays < totalDays && defaultRate != null) {
+            long uncoveredDays = totalDays - totalOverlapDays;
+            String formulaPart = String.format("((%s%d*%.6f)/365*%d)", 
+                openingFuturePrincipalCol, rowNum, defaultRate, uncoveredDays);
+            formulaParts.add(formulaPart);
+        }
+        
+        if (formulaParts.isEmpty()) {
+            return "0";
+        }
+        
+        // Join all formula parts with +
+        return String.join("+", formulaParts);
+    }
+    
+    private int getNoOfDaysColumnIndex() {
+        return 8; // colNoOfDays
+    }
+
     private void createInterestValidationsSheet(XSSFWorkbook workbook, List<SSRSFileDataEntity> ssrsData, 
                                                 Map<String, PartnerPayoutDetailsAll> payoutMap, Deal deal, 
-                                                Integer year, Integer month) {
+                                                Integer year, Integer month, List<InterestRateChange> interestRateChanges) {
         Sheet sheet = workbook.createSheet("Interest Validations");
 
         // Create color styles (reuse colors from Sheet1)
@@ -706,15 +797,17 @@ public class SSRSExcelExportService {
         int colOpeningFuturePrincipal = 1;
         int colAF = 2;
         int colDiff = 3;
-        int colOpeningInterestOverdue = 4;
-        int colClosingOverdue = 5;
-        int colCutOffDate = 6;
-        int colNoOfDays = 7;
-        int colFTPInterestDA = 8;
-        int colPayoutReport = 9;
-        int colOverdueInterestCollection = 10;
-        int colTotalPayout = 11;
-        int colDiff1 = 12;
+        int colRemarksDiff = 4;
+        int colOpeningInterestOverdue = 5;
+        int colClosingOverdue = 6;
+        int colCutOffDate = 7;
+        int colNoOfDays = 8;
+        int colFTPInterestDA = 9;
+        int colPayoutReport = 10;
+        int colOverdueInterestCollection = 11;
+        int colTotalPayout = 12;
+        int colDiff1 = 13;
+        int colRemarksDiff1 = 14;
 
         // Get deal rate (stored as decimal, e.g., 0.23 for 23%)
         Double dealRate = (deal != null && deal.getAnnualInterestRate() != null) 
@@ -755,6 +848,9 @@ public class SSRSExcelExportService {
         header.createCell(colDiff).setCellValue("Diff");
         header.getCell(colDiff).setCellStyle(sandalHeaderStyle);
         
+        header.createCell(colRemarksDiff).setCellValue("Remarks");
+        header.getCell(colRemarksDiff).setCellStyle(sandalHeaderStyle);
+        
         header.createCell(colOpeningInterestOverdue).setCellValue("Opening interest Overdue");
         header.getCell(colOpeningInterestOverdue).setCellStyle(grayHeaderStyle);
         
@@ -779,8 +875,11 @@ public class SSRSExcelExportService {
         header.createCell(colTotalPayout).setCellValue("Total Payout");
         header.getCell(colTotalPayout).setCellStyle(lightBlueHeaderStyle);
         
-        header.createCell(colDiff1).setCellValue("Diff 1");
+        header.createCell(colDiff1).setCellValue("Difference Int Collection");
         header.getCell(colDiff1).setCellStyle(grayHeaderStyle);
+        
+        header.createCell(colRemarksDiff1).setCellValue("Remarks");
+        header.getCell(colRemarksDiff1).setCellStyle(grayHeaderStyle);
 
         // Data rows (starting from row 2)
         int rowIdx = dataStartRow;
@@ -820,26 +919,22 @@ public class SSRSExcelExportService {
             diffCell.setCellFormula(String.format("%s%d-%s%d", openingFuturePrincipalCol, rowIdx + 1, afCol, rowIdx + 1));
             diffCell.setCellStyle(sandalDataStyle);
             
-            // Opening interest Overdue (gray, right-aligned) - sellerInterestOverdue
+            // Remarks for Diff (sandal, right-aligned, formula) - IF(ABS(Diff)>1,"Not Ok","Ok")
+            Cell remarksDiffCell = row.createCell(colRemarksDiff);
+            String diffCol = getColumnLetter(colDiff);
+            remarksDiffCell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Not Ok\",\"Ok\")", diffCol, rowIdx + 1));
+            remarksDiffCell.setCellStyle(sandalDataStyle);
+            
+            // Opening interest Overdue (gray, right-aligned) - bsItBeginningInterestReceivable90
             Cell openingInterestOverdueCell = row.createCell(colOpeningInterestOverdue);
-            if (payout != null && payout.getSellerInterestOverdue() != null) {
-                setNumericCellValue(openingInterestOverdueCell, payout.getSellerInterestOverdue());
-            } else {
-                openingInterestOverdueCell.setCellValue(0);
-            }
+            Object openingInterestOverdueValue = getMetadataValue(ssrs, "bsItBeginningInterestReceivable90");
+            setNumericCellValue(openingInterestOverdueCell, openingInterestOverdueValue);
             openingInterestOverdueCell.setCellStyle(grayDataStyle);
             
-            // Closing Overdue (gray, right-aligned, formula) - sellerTotalInterestComponentPaid - sellerTotalInterestDue
+            // Closing Overdue (gray, right-aligned) - bsItdEndInterestReceivable90
             Cell closingOverdueCell = row.createCell(colClosingOverdue);
-            if (payout != null) {
-                BigDecimal closingOverdue = safeSubtract(
-                    payout.getSellerTotalInterestComponentPaid(),
-                    payout.getSellerTotalInterestDue()
-                );
-                setNumericCellValue(closingOverdueCell, closingOverdue);
-            } else {
-                closingOverdueCell.setCellValue(0);
-            }
+            Object closingOverdueValue = getMetadataValue(ssrs, "bsItdEndInterestReceivable90");
+            setNumericCellValue(closingOverdueCell, closingOverdueValue);
             closingOverdueCell.setCellStyle(grayDataStyle);
             
             // Cut-Off Date (gray, right-aligned) - cycleEndDate
@@ -851,24 +946,30 @@ public class SSRSExcelExportService {
             }
             cutOffDateCell.setCellStyle(grayDataStyle);
             
-            // No of days (gray, right-aligned) - calculate days in month from cycleEndDate
+            // No of days (gray, right-aligned) - calculate days between cycleStartDate and cycleEndDate
             Cell noOfDaysCell = row.createCell(colNoOfDays);
-            if (payout != null && payout.getCycleEndDate() != null) {
-                int daysInMonth = payout.getCycleEndDate().lengthOfMonth();
-                noOfDaysCell.setCellValue(daysInMonth);
+            if (payout != null && payout.getCycleStartDate() != null && payout.getCycleEndDate() != null) {
+                long daysBetween = ChronoUnit.DAYS.between(payout.getCycleStartDate(), payout.getCycleEndDate());
+                noOfDaysCell.setCellValue(daysBetween);
             } else {
                 noOfDaysCell.setCellValue(0);
             }
             noOfDaysCell.setCellStyle(grayDataStyle);
             
-            // FTP - Interest DA (sandal, right-aligned, formula) - ((Opening Future Principal * Deal rate)/365 * No of days)
+            // FTP - Interest DA (sandal, right-aligned, formula) - Weighted average from interest rate changes
             Cell ftpInterestDACell = row.createCell(colFTPInterestDA);
             String openingFuturePrincipalColForFTP = getColumnLetter(colOpeningFuturePrincipal);
-            String noOfDaysCol = getColumnLetter(colNoOfDays);
-            // Formula: ((Opening Future Principal * Deal rate)/365 * No of days)
-            // Deal rate is stored as decimal (e.g., 0.23 for 23%)
-            String ftpFormula = String.format("((%s%d*%.6f)/365*%s%d)", 
-                openingFuturePrincipalColForFTP, rowIdx + 1, dealRate, noOfDaysCol, rowIdx + 1);
+            String ftpFormula = "0";
+            if (payout != null && payout.getCycleStartDate() != null && payout.getCycleEndDate() != null) {
+                ftpFormula = generateFTPInterestDAFormula(
+                    openingFuturePrincipalColForFTP,
+                    rowIdx + 1,
+                    payout.getCycleStartDate(),
+                    payout.getCycleEndDate(),
+                    interestRateChanges,
+                    dealRate
+                );
+            }
             ftpInterestDACell.setCellFormula(ftpFormula);
             ftpInterestDACell.setCellStyle(sandalDataStyle);
             
@@ -902,12 +1003,18 @@ public class SSRSExcelExportService {
                 payoutReportCol, rowIdx + 1, overdueInterestCollectionCol, rowIdx + 1));
             totalPayoutCell.setCellStyle(lightBlueDataStyle);
             
-            // Diff 1 (gray, right-aligned, formula) - FTP - Interest DA - Total Payout
+            // Difference Int Collection (gray, right-aligned, formula) - FTP - Interest DA - Total Payout
             Cell diff1Cell = row.createCell(colDiff1);
             String ftpInterestDACol = getColumnLetter(colFTPInterestDA);
             String totalPayoutCol = getColumnLetter(colTotalPayout);
             diff1Cell.setCellFormula(String.format("%s%d-%s%d", ftpInterestDACol, rowIdx + 1, totalPayoutCol, rowIdx + 1));
             diff1Cell.setCellStyle(grayDataStyle);
+            
+            // Remarks for Diff1 (gray, right-aligned, formula) - IF(ABS(Diff1)>1,"Not Ok","")
+            Cell remarksDiff1Cell = row.createCell(colRemarksDiff1);
+            String diff1Col = getColumnLetter(colDiff1);
+            remarksDiff1Cell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Not Ok\",\"\")", diff1Col, rowIdx + 1));
+            remarksDiff1Cell.setCellStyle(grayDataStyle);
             
             rowIdx++;
         }
@@ -917,6 +1024,7 @@ public class SSRSExcelExportService {
         sheet.setColumnWidth(colOpeningFuturePrincipal, 6000);
         sheet.setColumnWidth(colAF, 5000);
         sheet.setColumnWidth(colDiff, 5000);
+        sheet.setColumnWidth(colRemarksDiff, 5000);
         sheet.setColumnWidth(colOpeningInterestOverdue, 6000);
         sheet.setColumnWidth(colClosingOverdue, 5500);
         sheet.setColumnWidth(colCutOffDate, 5000);
@@ -925,7 +1033,8 @@ public class SSRSExcelExportService {
         sheet.setColumnWidth(colPayoutReport, 6000);
         sheet.setColumnWidth(colOverdueInterestCollection, 6500);
         sheet.setColumnWidth(colTotalPayout, 5500);
-        sheet.setColumnWidth(colDiff1, 5000);
+        sheet.setColumnWidth(colDiff1, 6000);
+        sheet.setColumnWidth(colRemarksDiff1, 5000);
     }
 
     private XSSFCellStyle createHeaderStyle(XSSFWorkbook workbook, org.apache.poi.xssf.usermodel.XSSFColor color, XSSFFont font) {
