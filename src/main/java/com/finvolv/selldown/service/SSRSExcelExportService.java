@@ -522,11 +522,7 @@ public class SSRSExcelExportService {
                     // If sellerClosingPos == 0, add sellerPrepaymentPaid, otherwise just sellerForeclosureChargesPaid
                     Cell payoutForeclosureChargesCell = row.createCell(colPayoutForeclosureCharges);
                     if (payout != null && payout.getSellerForeclosureChargesPaid() != null) {
-                        BigDecimal foreclosureCharges = payout.getSellerForeclosureChargesPaid();
-                        // Only add sellerPrepaymentPaid if sellerClosingPos == 0
-                        if (payout.getSellerClosingPos() != null && payout.getSellerClosingPos().compareTo(BigDecimal.ZERO) == 0) {
-                            foreclosureCharges = safeAdd(foreclosureCharges, payout.getSellerPrepaymentPaid());
-                        }
+                        BigDecimal foreclosureCharges = payout.getSellerForeclosureChargesPaid();                       
                         setNumericCellValue(payoutForeclosureChargesCell, foreclosureCharges);
                     } else {
                         payoutForeclosureChargesCell.setCellValue(0);
