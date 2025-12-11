@@ -808,6 +808,14 @@ public class SSRSExcelExportService {
         int colTotalPayout = 12;
         int colDiff1 = 13;
         int colRemarksDiff1 = 14;
+        int colFtmNotPaid = 15;
+        int colClosingIntFinance = 16;
+        int colClosingIntBusiness = 17;
+        int colDiffClosingInt = 18;
+        int colRemarksClosingInt = 19;
+        int colOpeningOverdueIntOfPrevious = 20;
+        int colOverdueCheck = 21;
+        int colOverdueCheckRemarks = 22;
 
         // Get deal rate (stored as decimal, e.g., 0.23 for 23%)
         Double dealRate = (deal != null && deal.getAnnualInterestRate() != null) 
@@ -831,6 +839,12 @@ public class SSRSExcelExportService {
         setSumFormula(sumRow, colOverdueInterestCollection, dataStartRow, dataEndRow);
         setSumFormula(sumRow, colTotalPayout, dataStartRow, dataEndRow);
         setSumFormula(sumRow, colDiff1, dataStartRow, dataEndRow);
+        setSumFormula(sumRow, colFtmNotPaid, dataStartRow, dataEndRow);
+        setSumFormula(sumRow, colClosingIntFinance, dataStartRow, dataEndRow);
+        setSumFormula(sumRow, colClosingIntBusiness, dataStartRow, dataEndRow);
+        setSumFormula(sumRow, colDiffClosingInt, dataStartRow, dataEndRow);
+        setSumFormula(sumRow, colOpeningOverdueIntOfPrevious, dataStartRow, dataEndRow);
+        setSumFormula(sumRow, colOverdueCheck, dataStartRow, dataEndRow);
 
         // Header row (row 1)
         Row header = sheet.createRow(1);
@@ -880,6 +894,30 @@ public class SSRSExcelExportService {
         
         header.createCell(colRemarksDiff1).setCellValue("Remarks");
         header.getCell(colRemarksDiff1).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colFtmNotPaid).setCellValue("FTM Not Paid");
+        header.getCell(colFtmNotPaid).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colClosingIntFinance).setCellValue("Closing Int (Finance)");
+        header.getCell(colClosingIntFinance).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colClosingIntBusiness).setCellValue("Closing Interest (Business)");
+        header.getCell(colClosingIntBusiness).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colDiffClosingInt).setCellValue("Diff Closing Int");
+        header.getCell(colDiffClosingInt).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colRemarksClosingInt).setCellValue("Remarks Closing Int");
+        header.getCell(colRemarksClosingInt).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colOpeningOverdueIntOfPrevious).setCellValue("Opening Overdue Int of Previous");
+        header.getCell(colOpeningOverdueIntOfPrevious).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colOverdueCheck).setCellValue("Overdue Check");
+        header.getCell(colOverdueCheck).setCellStyle(grayHeaderStyle);
+
+        header.createCell(colOverdueCheckRemarks).setCellValue("Overdue Check Remarks");
+        header.getCell(colOverdueCheckRemarks).setCellStyle(grayHeaderStyle);
 
         // Data rows (starting from row 2)
         int rowIdx = dataStartRow;
@@ -1015,6 +1053,60 @@ public class SSRSExcelExportService {
             String diff1Col = getColumnLetter(colDiff1);
             remarksDiff1Cell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Not Ok\",\"\")", diff1Col, rowIdx + 1));
             remarksDiff1Cell.setCellStyle(grayDataStyle);
+
+            // FTM NOT PAID: If Total Payout is 0 then use FTP - Interest DA, else 0
+            Cell ftmNotPaidCell = row.createCell(colFtmNotPaid);
+            String ftmFormula = String.format("IF(%s%d=0,%s%d,0)", totalPayoutCol, rowIdx + 1, ftpInterestDACol, rowIdx + 1);
+            ftmNotPaidCell.setCellFormula(ftmFormula);
+            ftmNotPaidCell.setCellStyle(grayDataStyle);
+
+            // Closing Int Finance: (Opening Overdue Int of Previous) - (Overdue Interest collection) - (FTM NOT PAID)
+            Cell closingIntFinanceCell = row.createCell(colClosingIntFinance);
+            String openingOverdueIntOfPreviousCol = getColumnLetter(colOpeningOverdueIntOfPrevious);
+            String overdueCollectionCol = getColumnLetter(colOverdueInterestCollection);
+            String closingFinFormula = String.format("%s%d-%s%d-%s%d", openingOverdueIntOfPreviousCol, rowIdx + 1, overdueCollectionCol, rowIdx + 1, getColumnLetter(colFtmNotPaid), rowIdx + 1);
+            closingIntFinanceCell.setCellFormula(closingFinFormula);
+            closingIntFinanceCell.setCellStyle(grayDataStyle);
+
+            // Closing Interest Business: sellerTotalInterestDue - sellerTotalInterestComponentPaid
+            Cell closingIntBusinessCell = row.createCell(colClosingIntBusiness);
+            if (payout != null) {
+                BigDecimal businessValue = safeSubtract(payout.getSellerTotalInterestDue(), payout.getSellerTotalInterestComponentPaid());
+                setNumericCellValue(closingIntBusinessCell, businessValue);
+            } else {
+                closingIntBusinessCell.setCellValue(0);
+            }
+            closingIntBusinessCell.setCellStyle(grayDataStyle);
+
+            // Diff Closing Int: Closing Int Finance - Closing Interest Business
+            Cell diffClosingIntCell = row.createCell(colDiffClosingInt);
+            String closingFinCol = getColumnLetter(colClosingIntFinance);
+            String closingBizCol = getColumnLetter(colClosingIntBusiness);
+            diffClosingIntCell.setCellFormula(String.format("%s%d-%s%d", closingFinCol, rowIdx + 1, closingBizCol, rowIdx + 1));
+            diffClosingIntCell.setCellStyle(grayDataStyle);
+
+            // Remarks Closing Int: if abs(diff) > 1 then "Mismatch"
+            Cell remarksClosingIntCell = row.createCell(colRemarksClosingInt);
+            String diffClosingCol = getColumnLetter(colDiffClosingInt);
+            remarksClosingIntCell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Mismatch\",\"\")", diffClosingCol, rowIdx + 1));
+            remarksClosingIntCell.setCellStyle(grayDataStyle);
+
+            // Opening Overdue Int of Previous: References "Opening interest Overdue" column
+            Cell openingOverdueIntOfPreviousCell = row.createCell(colOpeningOverdueIntOfPrevious);
+            String openingInterestOverdueCol = getColumnLetter(colOpeningInterestOverdue);
+            openingOverdueIntOfPreviousCell.setCellFormula(String.format("%s%d", openingInterestOverdueCol, rowIdx + 1));
+            openingOverdueIntOfPreviousCell.setCellStyle(grayDataStyle);
+
+            // Overdue Check: (Opening Overdue Int of Previous) - (Overdue Interest collection)
+            Cell overdueCheckCell = row.createCell(colOverdueCheck);
+            overdueCheckCell.setCellFormula(String.format("%s%d-%s%d", openingOverdueIntOfPreviousCol, rowIdx + 1, overdueCollectionCol, rowIdx + 1));
+            overdueCheckCell.setCellStyle(grayDataStyle);
+
+            // Overdue Check Remarks: if > 0 then "Error"
+            Cell overdueCheckRemarksCell = row.createCell(colOverdueCheckRemarks);
+            String overdueCheckCol = getColumnLetter(colOverdueCheck);
+            overdueCheckRemarksCell.setCellFormula(String.format("IF(%s%d>0,\"Error\",\"\")", overdueCheckCol, rowIdx + 1));
+            overdueCheckRemarksCell.setCellStyle(grayDataStyle);
             
             rowIdx++;
         }
@@ -1035,6 +1127,14 @@ public class SSRSExcelExportService {
         sheet.setColumnWidth(colTotalPayout, 5500);
         sheet.setColumnWidth(colDiff1, 6000);
         sheet.setColumnWidth(colRemarksDiff1, 5000);
+        sheet.setColumnWidth(colFtmNotPaid, 5500);
+        sheet.setColumnWidth(colClosingIntFinance, 6500);
+        sheet.setColumnWidth(colClosingIntBusiness, 6500);
+        sheet.setColumnWidth(colDiffClosingInt, 6000);
+        sheet.setColumnWidth(colRemarksClosingInt, 5000);
+        sheet.setColumnWidth(colOpeningOverdueIntOfPrevious, 6500);
+        sheet.setColumnWidth(colOverdueCheck, 6000);
+        sheet.setColumnWidth(colOverdueCheckRemarks, 6000);
     }
 
     private XSSFCellStyle createHeaderStyle(XSSFWorkbook workbook, org.apache.poi.xssf.usermodel.XSSFColor color, XSSFFont font) {
