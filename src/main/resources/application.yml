@@ -1,5 +1,5 @@
 server:
-  port: 8090
+  port: 8076
 
 spring:
   webflux.base-path: "/selldown-management-service"
