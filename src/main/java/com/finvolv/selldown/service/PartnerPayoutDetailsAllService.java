@@ -249,32 +249,33 @@ public class PartnerPayoutDetailsAllService {
                                     monthOnMonthDayMono = loanDetailRepository.findAll()
                                         .filter(ld -> payout.getLmsLan() != null && payout.getLmsLan().equals(ld.getLmsLan()))
                                         .next()
-                                        .switchIfEmpty(Mono.error(new IllegalArgumentException(
-                                            "No LoanDetail found for LAN: " + payout.getLmsLan() + ". Cannot determine monthOnMonthDay from Deal table.")))
+                                        .switchIfEmpty(Mono.defer(() -> {
+                                            logger.warn("No LoanDetail found for LAN: {}. Skipping this record.", payout.getLmsLan());
+                                            return Mono.empty();
+                                        }))
                                         .flatMap(loanDetail -> {
                                             if (loanDetail.getDealId() == null) {
-                                                return Mono.error(new IllegalArgumentException(
-                                                    "LoanDetail for LAN " + payout.getLmsLan() + " has no dealId. Cannot retrieve monthOnMonthDay from Deal table."));
+                                                logger.warn("LoanDetail for LAN {} has no dealId. Skipping this record.", payout.getLmsLan());
+                                                return Mono.empty();
                                             }
                                             return dealRepository.findById(loanDetail.getDealId())
-                                                .switchIfEmpty(Mono.error(new IllegalArgumentException(
-                                                    "Deal with ID " + loanDetail.getDealId() + " not found for LAN " + payout.getLmsLan() + ". Cannot retrieve monthOnMonthDay.")))
+                                                .switchIfEmpty(Mono.defer(() -> {
+                                                    logger.warn("Deal with ID {} not found for LAN {}. Skipping this record.", 
+                                                        loanDetail.getDealId(), payout.getLmsLan());
+                                                    return Mono.empty();
+                                                }))
                                                 .map(deal -> {
                                                     Integer momDay = deal.getMonthOnMonthDay();
                                                     if (momDay == null) {
-                                                        throw new IllegalArgumentException(
-                                                            "monthOnMonthDay is null in Deal " + deal.getId() + " for LAN " + payout.getLmsLan() + 
-                                                            ". monthOnMonthDay must be set in Deal table.");
+                                                        logger.warn("monthOnMonthDay is null in Deal {} for LAN {}. Skipping this record.", 
+                                                            deal.getId(), payout.getLmsLan());
+                                                        return null;
                                                     }
                                                     logger.info("Retrieved monthOnMonthDay={} from Deal table for LAN {} (Deal {})", 
                                                         momDay, payout.getLmsLan(), deal.getId());
                                                     return momDay;
-                                                });
-                                        })
-                                        .onErrorResume(error -> {
-                                            logger.error("Failed to retrieve monthOnMonthDay from Deal table for LAN {}: {}", 
-                                                payout.getLmsLan(), error.getMessage());
-                                            return Mono.error(error);
+                                                })
+                                                .filter(momDay -> momDay != null);
                                         });
                                 }
                                 

@@ -98,11 +98,6 @@ public class SSRSExcelExportService {
                 org.apache.poi.xssf.usermodel.XSSFColor blueColor = new org.apache.poi.xssf.usermodel.XSSFColor(
                     new byte[]{(byte)68, (byte)114, (byte)196}, null);
                 
-                // Sandal: Light brown/beige for calculation columns (RGB: 217, 225, 242 - but this seems too blue)
-                // Better sandal/beige color: RGB: 218, 150, 148 or RGB: 255, 242, 204 or RGB: 230, 184, 183
-                // Using a more accurate sandal color: RGB: 230, 184, 183 (light brown/beige)
-                org.apache.poi.xssf.usermodel.XSSFColor sandalColor = new org.apache.poi.xssf.usermodel.XSSFColor(
-                    new byte[]{(byte)230, (byte)184, (byte)183}, null);
                 
                 // Green style for LAN header
                 XSSFCellStyle greenHeaderStyle = workbook.createCellStyle();
@@ -124,23 +119,31 @@ public class SSRSExcelExportService {
                 blueHeaderStyle.setWrapText(true);
                 blueHeaderStyle.setIndention((short) 1); // Add padding
                 
-                // Sandal/Beige style for headers
-                XSSFCellStyle sandalHeaderStyle = workbook.createCellStyle();
-                sandalHeaderStyle.setFillForegroundColor(sandalColor);
-                sandalHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
-                sandalHeaderStyle.setFont(boldFont);
-                sandalHeaderStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
-                sandalHeaderStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
-                sandalHeaderStyle.setWrapText(true);
-                sandalHeaderStyle.setIndention((short) 1); // Add padding
+                // Yellow color for calculation columns (RGB: 255, 192, 0 - Dark yellow)
+                org.apache.poi.xssf.usermodel.XSSFColor yellowColor = new org.apache.poi.xssf.usermodel.XSSFColor(
+                    new byte[]{(byte)255, (byte)192, (byte)0}, null);
+                
+                // Yellow style for headers
+                XSSFCellStyle yellowHeaderStyle = workbook.createCellStyle();
+                yellowHeaderStyle.setFillForegroundColor(yellowColor);
+                yellowHeaderStyle.setFillPattern(FillPatternType.SOLID_FOREGROUND);
+                yellowHeaderStyle.setFont(boldFont);
+                yellowHeaderStyle.setAlignment(org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
+                yellowHeaderStyle.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+                yellowHeaderStyle.setWrapText(true);
+                yellowHeaderStyle.setIndention((short) 1); // Add padding
                 
                 // Data cell styles (white background, proper alignment)
                 XSSFCellStyle greenDataStyle = createWhiteDataCellStyle(workbook, 
                     org.apache.poi.ss.usermodel.HorizontalAlignment.LEFT);
+                XSSFCellStyle greenRightDataStyle = createWhiteDataCellStyle(workbook, 
+                    org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
                 XSSFCellStyle blueDataStyle = createWhiteDataCellStyle(workbook, 
                     org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
-                XSSFCellStyle sandalDataStyle = createWhiteDataCellStyle(workbook, 
+                XSSFCellStyle yellowDataStyle = createWhiteDataCellStyle(workbook, 
                     org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
+                XSSFCellStyle yellowCenterDataStyle = createWhiteDataCellStyle(workbook, 
+                    org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
                 XSSFCellStyle centerDataStyle = createWhiteDataCellStyle(workbook, 
                     org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
                 
@@ -231,39 +234,39 @@ public class SSRSExcelExportService {
                 
                 Cell statusHeader = header.createCell(colStatus);
                 statusHeader.setCellValue("Status");
-                statusHeader.setCellStyle(blueHeaderStyle);
+                statusHeader.setCellStyle(greenHeaderStyle);
                 
                 Cell bsFtmBeginningPRHeader = header.createCell(colBSFtmBeginningPR90);
                 bsFtmBeginningPRHeader.setCellValue("BS  OPENING Principle receivable 90%");
-                bsFtmBeginningPRHeader.setCellStyle(blueHeaderStyle);
+                bsFtmBeginningPRHeader.setCellStyle(greenHeaderStyle);
                 
                 Cell bsItdHeader = header.createCell(colBSITDEnd);
                 bsItdHeader.setCellValue("BS ITD End Principle receivable 90%");
-                bsItdHeader.setCellStyle(blueHeaderStyle);
+                bsItdHeader.setCellStyle(greenHeaderStyle);
                 
                 Cell principalDAHeader = header.createCell(colPrincipalDA);
                 principalDAHeader.setCellValue("Principal DA");
-                principalDAHeader.setCellStyle(sandalHeaderStyle);
+                principalDAHeader.setCellStyle(greenHeaderStyle);
                 
                 Cell vdprHeader = header.createCell(colVDPR);
                 vdprHeader.setCellValue("VD PR");
-                vdprHeader.setCellStyle(sandalHeaderStyle);
+                vdprHeader.setCellStyle(greenHeaderStyle);
 
                 Cell plFtmDebt90Header = header.createCell(colPLFtmDebt90);
                 plFtmDebt90Header.setCellValue("PL FTM Bad Debt 90");
-                plFtmDebt90Header.setCellStyle(sandalHeaderStyle);
+                plFtmDebt90Header.setCellStyle(greenHeaderStyle);
 
                 Cell plFtmBadDebtRecovery90Header = header.createCell(colPLFtmBadDebtRecovery90);
                 plFtmBadDebtRecovery90Header.setCellValue("PL FTM Bad Debt Recovery 90");
-                plFtmBadDebtRecovery90Header.setCellStyle(sandalHeaderStyle);
+                plFtmBadDebtRecovery90Header.setCellStyle(greenHeaderStyle);
 
                 Cell plFtmSettlementLoss90Header = header.createCell(colPLFtmSettlementLoss90);
                 plFtmSettlementLoss90Header.setCellValue("PL FTM Settlement Loss 90");
-                plFtmSettlementLoss90Header.setCellStyle(sandalHeaderStyle);
+                plFtmSettlementLoss90Header.setCellStyle(greenHeaderStyle);
                 
                 Cell totalVDHeader = header.createCell(colTotalVD);
                 totalVDHeader.setCellValue("Total VD");
-                totalVDHeader.setCellStyle(sandalHeaderStyle);
+                totalVDHeader.setCellStyle(yellowHeaderStyle);
                 
                 Cell payoutReportHeader = header.createCell(colPayoutReport);
                 payoutReportHeader.setCellValue("Payout Report");
@@ -279,33 +282,33 @@ public class SSRSExcelExportService {
                 
                 Cell totalPayoutHeader = header.createCell(colTotalPayout);
                 totalPayoutHeader.setCellValue("Total payout");
-                totalPayoutHeader.setCellStyle(blueHeaderStyle);
+                totalPayoutHeader.setCellStyle(yellowHeaderStyle);
                 
                 Cell diffHeader = header.createCell(colDiff);
                 diffHeader.setCellValue("Diff");
-                diffHeader.setCellStyle(sandalHeaderStyle);
+                diffHeader.setCellStyle(yellowHeaderStyle);
                 
                 Cell overdueCheckHeader = header.createCell(colOverdueCheck);
                 overdueCheckHeader.setCellValue("Overdue check");
-                overdueCheckHeader.setCellStyle(sandalHeaderStyle);
+                overdueCheckHeader.setCellStyle(yellowHeaderStyle);
 
                 Cell principalRemarksHeader = header.createCell(colPrincipalRemarks);
                 principalRemarksHeader.setCellValue("Principal Remarks");
-                principalRemarksHeader.setCellStyle(sandalHeaderStyle);
+                principalRemarksHeader.setCellStyle(yellowHeaderStyle);
                 
                 // Empty columns
                 Cell empty1Header = header.createCell(colEmpty1);
                 empty1Header.setCellValue("");
-                empty1Header.setCellStyle(sandalHeaderStyle);
+                empty1Header.setCellStyle(yellowHeaderStyle);
                 
                 Cell empty2Header = header.createCell(colEmpty2);
                 empty2Header.setCellValue("");
-                empty2Header.setCellStyle(sandalHeaderStyle);
+                empty2Header.setCellStyle(yellowHeaderStyle);
                 
                 // First set: Bounce Charges columns
                 Cell plFtmInstructBounceCharges90Header = header.createCell(colPlFtmInstructBounceCharges90);
                 plFtmInstructBounceCharges90Header.setCellValue("Bounce charges DA");
-                plFtmInstructBounceCharges90Header.setCellStyle(sandalHeaderStyle);
+                plFtmInstructBounceCharges90Header.setCellStyle(greenHeaderStyle);
                 
                 Cell payoutBounceChargesHeader = header.createCell(colPayoutBounceCharges);
                 payoutBounceChargesHeader.setCellValue("Payout Bounce Charges");
@@ -313,16 +316,16 @@ public class SSRSExcelExportService {
                 
                 Cell diffBounceChargesHeader = header.createCell(colDiffBounceCharges);
                 diffBounceChargesHeader.setCellValue("Diff bounce charges");
-                diffBounceChargesHeader.setCellStyle(sandalHeaderStyle);
+                diffBounceChargesHeader.setCellStyle(yellowHeaderStyle);
                 
                 Cell remarksBounceChargesHeader = header.createCell(colRemarksBounceCharges);
                 remarksBounceChargesHeader.setCellValue("Remarks");
-                remarksBounceChargesHeader.setCellStyle(sandalHeaderStyle);
+                remarksBounceChargesHeader.setCellStyle(yellowHeaderStyle);
                 
                 // Second set: Foreclosure Charges columns
                 Cell plFtmForeclosureCharges90Header = header.createCell(colPlFtmForeclosureCharges90);
                 plFtmForeclosureCharges90Header.setCellValue("Foreclosure charges DA");
-                plFtmForeclosureCharges90Header.setCellStyle(sandalHeaderStyle);
+                plFtmForeclosureCharges90Header.setCellStyle(greenHeaderStyle);
                 
                 Cell payoutForeclosureChargesHeader = header.createCell(colPayoutForeclosureCharges);
                 payoutForeclosureChargesHeader.setCellValue("Payout foreclosure charges");
@@ -330,11 +333,11 @@ public class SSRSExcelExportService {
                 
                 Cell diffForeclosureChargesHeader = header.createCell(colDiffForeclosureCharges);
                 diffForeclosureChargesHeader.setCellValue("Diff Foreclosure charges");
-                diffForeclosureChargesHeader.setCellStyle(sandalHeaderStyle);
+                diffForeclosureChargesHeader.setCellStyle(yellowHeaderStyle);
                 
                 Cell remarksForeclosureChargesHeader = header.createCell(colRemarksForeclosureCharges);
                 remarksForeclosureChargesHeader.setCellValue("Remarks");
-                remarksForeclosureChargesHeader.setCellStyle(sandalHeaderStyle);
+                remarksForeclosureChargesHeader.setCellStyle(yellowHeaderStyle);
 
                 // Data rows (starting from row 2)
                 int rowIdx = dataStartRow;
@@ -354,62 +357,62 @@ public class SSRSExcelExportService {
                     statusCell.setCellValue(statusOfLoan != null ? statusOfLoan.toString() : "");
                     statusCell.setCellStyle(centerDataStyle);
                     
-                    // BS OPENING Principle receivable 90% (blue, right-aligned numbers)
+                    // BS OPENING Principle receivable 90% (green, right-aligned numbers)
                     Cell bsFtmBeginningPRCell = row.createCell(colBSFtmBeginningPR90);
                     Object bsFtmBeginningPRValue = getMetadataValue(ssrs, "bsftmBeginningPrincipleReceivable90");
                     setNumericCellValue(bsFtmBeginningPRCell, bsFtmBeginningPRValue);
-                    bsFtmBeginningPRCell.setCellStyle(blueDataStyle);
+                    bsFtmBeginningPRCell.setCellStyle(greenRightDataStyle);
                     
-                    // BS ITD End Principle receivable 90% (blue, right-aligned numbers)
+                    // BS ITD End Principle receivable 90% (green, right-aligned numbers)
                     Cell bsItdCell = row.createCell(colBSITDEnd);
                     Object bsItdValue = getMetadataValue(ssrs, "bsItdEndPrincipleReceivable90");
                     setNumericCellValue(bsItdCell, bsItdValue);
-                    bsItdCell.setCellStyle(blueDataStyle);
+                    bsItdCell.setCellStyle(greenRightDataStyle);
                     
-                    // Principal DA (sandal, right-aligned numbers)
+                    // Principal DA (green, right-aligned numbers)
                     Cell principalDACell = row.createCell(colPrincipalDA);
                     Object principalDAValue = getMetadataValue(ssrs, "bsFtmLoanBalance90");
                     setNumericCellValue(principalDACell, principalDAValue);
-                    principalDACell.setCellStyle(sandalDataStyle);
+                    principalDACell.setCellStyle(greenRightDataStyle);
                     
-                    // VD PR (sandal, right-aligned numbers)
+                    // VD PR (green, right-aligned numbers)
                     Cell vdprCell = row.createCell(colVDPR);
                     Object vdprValue = getMetadataValue(ssrs, "bsFtmPrincipleReceivable90");
                     setNumericCellValue(vdprCell, vdprValue);
-                    vdprCell.setCellStyle(sandalDataStyle);
+                    vdprCell.setCellStyle(greenRightDataStyle);
 
-                    // PL FTM Bad Debt 90 (sandal, right-aligned numbers)
+                    // PL FTM Bad Debt 90 (green, right-aligned numbers)
                     Cell plFtmDebt90Cell = row.createCell(colPLFtmDebt90);
                     Object plFtmDebt90Value = getMetadataValue(ssrs, "plFtmDebt90");
                     setNumericCellValue(plFtmDebt90Cell, plFtmDebt90Value);
-                    plFtmDebt90Cell.setCellStyle(sandalDataStyle);
+                    plFtmDebt90Cell.setCellStyle(greenRightDataStyle);
 
-                    // PL FTM Bad Debt Recovery 90 (sandal, right-aligned numbers)
+                    // PL FTM Bad Debt Recovery 90 (green, right-aligned numbers)
                     Cell plFtmBadDebtRecovery90Cell = row.createCell(colPLFtmBadDebtRecovery90);
                     Object plFtmBadDebtRecovery90Value = getMetadataValue(ssrs, "plFtmBadDebtRecovery90");
                     setNumericCellValue(plFtmBadDebtRecovery90Cell, plFtmBadDebtRecovery90Value);
-                    plFtmBadDebtRecovery90Cell.setCellStyle(sandalDataStyle);
+                    plFtmBadDebtRecovery90Cell.setCellStyle(greenRightDataStyle);
 
-                    // PL FTM Settlement Loss 90 (sandal, right-aligned numbers)
+                    // PL FTM Settlement Loss 90 (green, right-aligned numbers)
                     Cell plFtmSettlementLoss90Cell = row.createCell(colPLFtmSettlementLoss90);
                     Object plFtmSettlementLoss90Value = getMetadataValue(ssrs, "plFtmSettlementLoss90");
                     setNumericCellValue(plFtmSettlementLoss90Cell, plFtmSettlementLoss90Value);
-                    plFtmSettlementLoss90Cell.setCellStyle(sandalDataStyle);
+                    plFtmSettlementLoss90Cell.setCellStyle(greenRightDataStyle);
                     
-                    // Total VD (sandal, right-aligned, formula)
+                    // Total VD (yellow, right-aligned, formula)
                     Cell totalVDCell = row.createCell(colTotalVD);
                     String principalDACol = getColumnLetter(colPrincipalDA);
                     String vdprCol = getColumnLetter(colVDPR);
                     String plFtmDebt90Col = getColumnLetter(colPLFtmDebt90);
                     String plFtmBadDebtRecovery90Col = getColumnLetter(colPLFtmBadDebtRecovery90);
                     String plFtmSettlementLoss90Col = getColumnLetter(colPLFtmSettlementLoss90);
-                    totalVDCell.setCellFormula(String.format("%s%d+%s%d+%s%d+%s%d+%s%d",
+                    totalVDCell.setCellFormula(wrapWithRound(String.format("%s%d+%s%d+%s%d+%s%d+%s%d",
                             principalDACol, rowIdx + 1,
                             vdprCol, rowIdx + 1,
                             plFtmDebt90Col, rowIdx + 1,
                             plFtmBadDebtRecovery90Col, rowIdx + 1,
-                            plFtmSettlementLoss90Col, rowIdx + 1));
-                    totalVDCell.setCellStyle(sandalDataStyle);
+                            plFtmSettlementLoss90Col, rowIdx + 1)));
+                    totalVDCell.setCellStyle(yellowDataStyle);
                     
                     // Payout Report (blue, right-aligned numbers)
                     Cell payoutReportCell = row.createCell(colPayoutReport);
@@ -420,7 +423,7 @@ public class SSRSExcelExportService {
                         );
                         setNumericCellValue(payoutReportCell, payoutReport);
                     } else {
-                        payoutReportCell.setCellValue(0);
+                        payoutReportCell.setCellFormula("ROUND(0,2)");
                     }
                     payoutReportCell.setCellStyle(blueDataStyle);
                     
@@ -429,7 +432,7 @@ public class SSRSExcelExportService {
                     if (payout != null && payout.getSellerPrincipalOverduePaid() != null) {
                         setNumericCellValue(overduePRCell, payout.getSellerPrincipalOverduePaid());
                     } else {
-                        overduePRCell.setCellValue(0);
+                        overduePRCell.setCellFormula("ROUND(0,2)");
                     }
                     overduePRCell.setCellStyle(blueDataStyle);
                     
@@ -442,57 +445,57 @@ public class SSRSExcelExportService {
                         );
                         setNumericCellValue(partPaymentFCCell, partPaymentFC);
                     } else {
-                        partPaymentFCCell.setCellValue(0);
+                        partPaymentFCCell.setCellFormula("ROUND(0,2)");
                     }
                     partPaymentFCCell.setCellStyle(blueDataStyle);
                     
-                    // Total payout (blue, right-aligned, formula)
+                    // Total payout (yellow, right-aligned, formula)
                     Cell totalPayoutCell = row.createCell(colTotalPayout);
                     String payoutReportCol = getColumnLetter(colPayoutReport);
                     String overduePRCol = getColumnLetter(colOverduePR);
                     String partPaymentFCCol = getColumnLetter(colPartPaymentFC);
-                    totalPayoutCell.setCellFormula(String.format("%s%d+%s%d+%s%d", 
-                        payoutReportCol, rowIdx + 1, overduePRCol, rowIdx + 1, partPaymentFCCol, rowIdx + 1));
-                    totalPayoutCell.setCellStyle(blueDataStyle);
+                    totalPayoutCell.setCellFormula(wrapWithRound(String.format("%s%d+%s%d+%s%d", 
+                        payoutReportCol, rowIdx + 1, overduePRCol, rowIdx + 1, partPaymentFCCol, rowIdx + 1)));
+                    totalPayoutCell.setCellStyle(yellowDataStyle);
                     
-                    // Diff (sandal, right-aligned, formula)
+                    // Diff (yellow, right-aligned, formula)
                     Cell diffCell = row.createCell(colDiff);
                     String totalVDCol = getColumnLetter(colTotalVD);
                     String totalPayoutCol = getColumnLetter(colTotalPayout);
-                    diffCell.setCellFormula(String.format("%s%d+%s%d", totalVDCol, rowIdx + 1, totalPayoutCol, rowIdx + 1));
-                    diffCell.setCellStyle(sandalDataStyle);
+                    diffCell.setCellFormula(wrapWithRound(String.format("%s%d+%s%d", totalVDCol, rowIdx + 1, totalPayoutCol, rowIdx + 1)));
+                    diffCell.setCellStyle(yellowDataStyle);
                     
-                    // Overdue check (sandal, right-aligned, formula with conditional formatting for negative)
+                    // Overdue check (yellow, right-aligned, formula with conditional formatting for negative)
                     Cell overdueCheckCell = row.createCell(colOverdueCheck);
                     String bsFtmBeginningPRCol = getColumnLetter(colBSFtmBeginningPR90);
                     String overduePRColForCheck = getColumnLetter(colOverduePR);
                     // Formula: BS OPENING Principle receivable 90% - Overdue PR
-                    overdueCheckCell.setCellFormula(String.format("%s%d-%s%d", bsFtmBeginningPRCol, rowIdx + 1, overduePRColForCheck, rowIdx + 1));
+                    overdueCheckCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", bsFtmBeginningPRCol, rowIdx + 1, overduePRColForCheck, rowIdx + 1)));
                     // Note: Conditional formatting for negative values would need to be applied via Excel's conditional formatting feature
-                    // For now, we'll use sandal style, but the formula will show negative values
-                    overdueCheckCell.setCellStyle(sandalDataStyle);
+                    // For now, we'll use yellow style, but the formula will show negative values
+                    overdueCheckCell.setCellStyle(yellowDataStyle);
 
-                    // Principal Remarks (centered text, based on Diff)
+                    // Principal Remarks (yellow background, centered text, based on Diff)
                     Cell principalRemarksCell = row.createCell(colPrincipalRemarks);
                     String diffCol = getColumnLetter(colDiff);
                     principalRemarksCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffCol, rowIdx + 1));
-                    principalRemarksCell.setCellStyle(centerDataStyle);
+                    principalRemarksCell.setCellStyle(yellowCenterDataStyle);
                     
                     // Empty columns
                     Cell empty1Cell = row.createCell(colEmpty1);
                     empty1Cell.setCellValue("");
-                    empty1Cell.setCellStyle(sandalDataStyle);
+                    empty1Cell.setCellStyle(yellowDataStyle);
                     
                     Cell empty2Cell = row.createCell(colEmpty2);
                     empty2Cell.setCellValue("");
-                    empty2Cell.setCellStyle(sandalDataStyle);
+                    empty2Cell.setCellStyle(yellowDataStyle);
                     
                     // First set: Bounce Charges columns
-                    // Bounce charges DA (sandal, right-aligned)
+                    // Bounce charges DA (green, right-aligned)
                     Cell plFtmInstructBounceCharges90Cell = row.createCell(colPlFtmInstructBounceCharges90);
                     Object plFtmInstructBounceCharges90Value = getMetadataValue(ssrs, "plFtmInstructBounceCharges90");
                     setNumericCellValue(plFtmInstructBounceCharges90Cell, plFtmInstructBounceCharges90Value);
-                    plFtmInstructBounceCharges90Cell.setCellStyle(sandalDataStyle);
+                    plFtmInstructBounceCharges90Cell.setCellStyle(greenRightDataStyle);
                     
                     // Payout Bounce Charges (blue, right-aligned) - sellerTotalChargesPaid - sellerForeclosureChargesPaid - sellerPrepaymentPaid
                     Cell payoutBounceChargesCell = row.createCell(colPayoutBounceCharges);
@@ -506,30 +509,30 @@ public class SSRSExcelExportService {
                         );
                         setNumericCellValue(payoutBounceChargesCell, payoutBounceCharges);
                     } else {
-                        payoutBounceChargesCell.setCellValue(0);
+                        payoutBounceChargesCell.setCellFormula("ROUND(0,2)");
                     }
                     payoutBounceChargesCell.setCellStyle(blueDataStyle);
                     
-                    // Diff bounce charges (sandal, right-aligned, formula)
+                    // Diff bounce charges (yellow, right-aligned, formula)
                     Cell diffBounceChargesCell = row.createCell(colDiffBounceCharges);
                     String plFtmInstructBounceCharges90Col = getColumnLetter(colPlFtmInstructBounceCharges90);
                     String payoutBounceChargesCol = getColumnLetter(colPayoutBounceCharges);
-                    diffBounceChargesCell.setCellFormula(String.format("%s%d-%s%d", 
-                        plFtmInstructBounceCharges90Col, rowIdx + 1, payoutBounceChargesCol, rowIdx + 1));
-                    diffBounceChargesCell.setCellStyle(sandalDataStyle);
+                    diffBounceChargesCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", 
+                        plFtmInstructBounceCharges90Col, rowIdx + 1, payoutBounceChargesCol, rowIdx + 1)));
+                    diffBounceChargesCell.setCellStyle(yellowDataStyle);
                     
-                    // Remarks bounce charges (centered text, based on Diff)
+                    // Remarks bounce charges (yellow background, centered text, based on Diff)
                     Cell remarksBounceChargesCell = row.createCell(colRemarksBounceCharges);
                     String diffBounceChargesCol = getColumnLetter(colDiffBounceCharges);
                     remarksBounceChargesCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffBounceChargesCol, rowIdx + 1));
-                    remarksBounceChargesCell.setCellStyle(centerDataStyle);
+                    remarksBounceChargesCell.setCellStyle(yellowCenterDataStyle);
                     
                     // Second set: Foreclosure Charges columns
-                    // Foreclosure charges DA (sandal, right-aligned)
+                    // Foreclosure charges DA (green, right-aligned)
                     Cell plFtmForeclosureCharges90Cell = row.createCell(colPlFtmForeclosureCharges90);
                     Object plFtmForeclosureCharges90Value = getMetadataValue(ssrs, "plFtmForeclosureCharges90");
                     setNumericCellValue(plFtmForeclosureCharges90Cell, plFtmForeclosureCharges90Value);
-                    plFtmForeclosureCharges90Cell.setCellStyle(sandalDataStyle);
+                    plFtmForeclosureCharges90Cell.setCellStyle(greenRightDataStyle);
                     
                     // Payout foreclosure charges (blue, right-aligned) - sellerForeclosureChargesPaid
                     // If sellerClosingPos == 0, add sellerPrepaymentPaid, otherwise just sellerForeclosureChargesPaid
@@ -538,23 +541,23 @@ public class SSRSExcelExportService {
                         BigDecimal foreclosureCharges = payout.getSellerForeclosureChargesPaid();                       
                         setNumericCellValue(payoutForeclosureChargesCell, foreclosureCharges);
                     } else {
-                        payoutForeclosureChargesCell.setCellValue(0);
+                        payoutForeclosureChargesCell.setCellFormula("ROUND(0,2)");
                     }
                     payoutForeclosureChargesCell.setCellStyle(blueDataStyle);
                     
-                    // Diff Foreclosure charges (sandal, right-aligned, formula)
+                    // Diff Foreclosure charges (yellow, right-aligned, formula)
                     Cell diffForeclosureChargesCell = row.createCell(colDiffForeclosureCharges);
                     String plFtmForeclosureCharges90Col = getColumnLetter(colPlFtmForeclosureCharges90);
                     String payoutForeclosureChargesCol = getColumnLetter(colPayoutForeclosureCharges);
-                    diffForeclosureChargesCell.setCellFormula(String.format("%s%d-%s%d", 
-                        plFtmForeclosureCharges90Col, rowIdx + 1, payoutForeclosureChargesCol, rowIdx + 1));
-                    diffForeclosureChargesCell.setCellStyle(sandalDataStyle);
+                    diffForeclosureChargesCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", 
+                        plFtmForeclosureCharges90Col, rowIdx + 1, payoutForeclosureChargesCol, rowIdx + 1)));
+                    diffForeclosureChargesCell.setCellStyle(yellowDataStyle);
                     
-                    // Remarks Foreclosure charges (centered text, based on Diff)
+                    // Remarks Foreclosure charges (yellow background, centered text, based on Diff)
                     Cell remarksForeclosureChargesCell = row.createCell(colRemarksForeclosureCharges);
                     String diffForeclosureChargesCol = getColumnLetter(colDiffForeclosureCharges);
                     remarksForeclosureChargesCell.setCellFormula(String.format("IF(ABS(%s%d)<=1,\"Ok\",\"Not Ok\")", diffForeclosureChargesCol, rowIdx + 1));
-                    remarksForeclosureChargesCell.setCellStyle(centerDataStyle);
+                    remarksForeclosureChargesCell.setCellStyle(yellowCenterDataStyle);
                     
                     rowIdx++;
                 }
@@ -605,19 +608,9 @@ public class SSRSExcelExportService {
     private void setSumFormula(Row row, int colIndex, int dataStartRow, int dataEndRow) {
         String columnLetter = getColumnLetter(colIndex);
         String formula = String.format("SUM(%s%d:%s%d)", columnLetter, dataStartRow + 1, columnLetter, dataEndRow + 1);
-        row.createCell(colIndex).setCellFormula(formula);
+        row.createCell(colIndex).setCellFormula(wrapWithRound(formula));
     }
 
-    private XSSFCellStyle createWhiteDataCellStyle(XSSFWorkbook workbook, 
-                                                    org.apache.poi.ss.usermodel.HorizontalAlignment alignment) {
-        XSSFCellStyle style = workbook.createCellStyle();
-        // White background (default, no fill needed)
-        style.setAlignment(alignment);
-        style.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
-        // Add padding for more spacious cells
-        style.setIndention((short) 1); // Small indentation
-        return style;
-    }
 
     private Object getMetadataValue(SSRSFileDataEntity ssrs, String key) {
         if (ssrs.getMetadata() != null && ssrs.getMetadata().containsKey(key)) {
@@ -628,20 +621,24 @@ public class SSRSExcelExportService {
 
     private void setNumericCellValue(Cell cell, Object value) {
         if (value == null) {
-            cell.setCellValue(0);
+            cell.setCellFormula("ROUND(0,2)");
             return;
         }
+        double numValue;
         if (value instanceof Number) {
-            cell.setCellValue(((Number) value).doubleValue());
+            numValue = ((Number) value).doubleValue();
         } else if (value instanceof BigDecimal) {
-            cell.setCellValue(((BigDecimal) value).doubleValue());
+            numValue = ((BigDecimal) value).doubleValue();
         } else {
             try {
-                cell.setCellValue(Double.parseDouble(value.toString()));
+                numValue = Double.parseDouble(value.toString());
             } catch (NumberFormatException e) {
-                cell.setCellValue(0);
+                cell.setCellFormula("ROUND(0,2)");
+                return;
             }
         }
+        // Use ROUND formula in Excel to round to 2 decimal places
+        cell.setCellFormula(String.format("ROUND(%s,2)", numValue));
     }
 
     private BigDecimal safeSubtract(BigDecimal a, BigDecimal b) {
@@ -654,6 +651,17 @@ public class SSRSExcelExportService {
         BigDecimal left = a == null ? BigDecimal.ZERO : a;
         BigDecimal right = b == null ? BigDecimal.ZERO : b;
         return left.add(right);
+    }
+
+    private XSSFCellStyle createWhiteDataCellStyle(XSSFWorkbook workbook, 
+                                                    org.apache.poi.ss.usermodel.HorizontalAlignment alignment) {
+        XSSFCellStyle style = workbook.createCellStyle();
+        // White background (default, no fill needed)
+        style.setAlignment(alignment);
+        style.setVerticalAlignment(org.apache.poi.ss.usermodel.VerticalAlignment.CENTER);
+        // Add padding for more spacious cells
+        style.setIndention((short) 1); // Small indentation
+        return style;
     }
 
     /**
@@ -670,6 +678,13 @@ public class SSRSExcelExportService {
         }
         
         return columnLetter.toString();
+    }
+
+    /**
+     * Wraps a formula or cell reference with ROUND function to 2 decimal places
+     */
+    private String wrapWithRound(String formulaOrReference) {
+        return String.format("ROUND(%s,2)", formulaOrReference);
     }
 
     /**
@@ -764,33 +779,30 @@ public class SSRSExcelExportService {
         org.apache.poi.xssf.usermodel.XSSFColor greenColor = new org.apache.poi.xssf.usermodel.XSSFColor(
             new byte[]{(byte)146, (byte)208, (byte)80}, null);
         
-        // Sandal color
-        org.apache.poi.xssf.usermodel.XSSFColor sandalColor = new org.apache.poi.xssf.usermodel.XSSFColor(
-            new byte[]{(byte)230, (byte)184, (byte)183}, null);
+        // Blue color (same as Principal sheet)
+        org.apache.poi.xssf.usermodel.XSSFColor blueColor = new org.apache.poi.xssf.usermodel.XSSFColor(
+            new byte[]{(byte)68, (byte)114, (byte)196}, null);
         
-        // Light blue color
-        org.apache.poi.xssf.usermodel.XSSFColor lightBlueColor = new org.apache.poi.xssf.usermodel.XSSFColor(
-            new byte[]{(byte)173, (byte)216, (byte)230}, null);
-        
-        // Gray color
-        org.apache.poi.xssf.usermodel.XSSFColor grayColor = new org.apache.poi.xssf.usermodel.XSSFColor(
-            new byte[]{(byte)217, (byte)217, (byte)217}, null);
+        // Yellow color (dark yellow)
+        org.apache.poi.xssf.usermodel.XSSFColor yellowColor = new org.apache.poi.xssf.usermodel.XSSFColor(
+            new byte[]{(byte)255, (byte)192, (byte)0}, null);
 
         // Header styles
         XSSFCellStyle greenHeaderStyle = createHeaderStyle(workbook, greenColor, boldFont);
-        XSSFCellStyle sandalHeaderStyle = createHeaderStyle(workbook, sandalColor, boldFont);
-        XSSFCellStyle lightBlueHeaderStyle = createHeaderStyle(workbook, lightBlueColor, boldFont);
-        XSSFCellStyle grayHeaderStyle = createHeaderStyle(workbook, grayColor, boldFont);
+        XSSFCellStyle blueHeaderStyle = createHeaderStyle(workbook, blueColor, boldFont);
+        XSSFCellStyle yellowHeaderStyle = createHeaderStyle(workbook, yellowColor, boldFont);
 
-        // Data styles (white background)
+        // Data styles (white background, proper alignment)
         XSSFCellStyle greenDataStyle = createWhiteDataCellStyle(workbook, 
             org.apache.poi.ss.usermodel.HorizontalAlignment.LEFT);
-        XSSFCellStyle sandalDataStyle = createWhiteDataCellStyle(workbook, 
+        XSSFCellStyle greenRightDataStyle = createWhiteDataCellStyle(workbook, 
             org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
-        XSSFCellStyle lightBlueDataStyle = createWhiteDataCellStyle(workbook, 
+        XSSFCellStyle blueDataStyle = createWhiteDataCellStyle(workbook, 
             org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
-        XSSFCellStyle grayDataStyle = createWhiteDataCellStyle(workbook, 
+        XSSFCellStyle yellowDataStyle = createWhiteDataCellStyle(workbook, 
             org.apache.poi.ss.usermodel.HorizontalAlignment.RIGHT);
+        XSSFCellStyle yellowCenterDataStyle = createWhiteDataCellStyle(workbook, 
+            org.apache.poi.ss.usermodel.HorizontalAlignment.CENTER);
 
         // Column indices
         int colLAN = 0;
@@ -857,67 +869,67 @@ public class SSRSExcelExportService {
         header.getCell(colOpeningFuturePrincipal).setCellStyle(greenHeaderStyle);
         
         header.createCell(colAF).setCellValue("AF");
-        header.getCell(colAF).setCellStyle(sandalHeaderStyle);
+        header.getCell(colAF).setCellStyle(blueHeaderStyle);
         
         header.createCell(colDiff).setCellValue("Diff");
-        header.getCell(colDiff).setCellStyle(sandalHeaderStyle);
+        header.getCell(colDiff).setCellStyle(yellowHeaderStyle);
         
         header.createCell(colRemarksDiff).setCellValue("Remarks");
-        header.getCell(colRemarksDiff).setCellStyle(sandalHeaderStyle);
+        header.getCell(colRemarksDiff).setCellStyle(yellowHeaderStyle);
         
         header.createCell(colOpeningInterestOverdue).setCellValue("Opening interest Overdue");
-        header.getCell(colOpeningInterestOverdue).setCellStyle(grayHeaderStyle);
+        header.getCell(colOpeningInterestOverdue).setCellStyle(greenHeaderStyle);
         
         header.createCell(colClosingOverdue).setCellValue("Closing Overdue");
-        header.getCell(colClosingOverdue).setCellStyle(grayHeaderStyle);
+        header.getCell(colClosingOverdue).setCellStyle(greenHeaderStyle);
         
         header.createCell(colCutOffDate).setCellValue("Cut-Off Date");
-        header.getCell(colCutOffDate).setCellStyle(grayHeaderStyle);
+        header.getCell(colCutOffDate).setCellStyle(yellowHeaderStyle);
         
         header.createCell(colNoOfDays).setCellValue("No of days");
-        header.getCell(colNoOfDays).setCellStyle(grayHeaderStyle);
+        header.getCell(colNoOfDays).setCellStyle(yellowHeaderStyle);
         
         header.createCell(colFTPInterestDA).setCellValue("FTP -Interest DA");
-        header.getCell(colFTPInterestDA).setCellStyle(sandalHeaderStyle);
+        header.getCell(colFTPInterestDA).setCellStyle(yellowHeaderStyle);
         
         header.createCell(colPayoutReport).setCellValue("Payout Report");
-        header.getCell(colPayoutReport).setCellStyle(lightBlueHeaderStyle);
+        header.getCell(colPayoutReport).setCellStyle(blueHeaderStyle);
         
         header.createCell(colOverdueInterestCollection).setCellValue("Overdue Interest collection");
-        header.getCell(colOverdueInterestCollection).setCellStyle(lightBlueHeaderStyle);
+        header.getCell(colOverdueInterestCollection).setCellStyle(blueHeaderStyle);
         
         header.createCell(colTotalPayout).setCellValue("Total Payout");
-        header.getCell(colTotalPayout).setCellStyle(lightBlueHeaderStyle);
+        header.getCell(colTotalPayout).setCellStyle(blueHeaderStyle);
         
         header.createCell(colDiff1).setCellValue("Difference Int Collection");
-        header.getCell(colDiff1).setCellStyle(grayHeaderStyle);
+        header.getCell(colDiff1).setCellStyle(yellowHeaderStyle);
         
         header.createCell(colRemarksDiff1).setCellValue("Remarks");
-        header.getCell(colRemarksDiff1).setCellStyle(grayHeaderStyle);
+        header.getCell(colRemarksDiff1).setCellStyle(yellowHeaderStyle);
 
         header.createCell(colFtmNotPaid).setCellValue("FTM Not Paid");
-        header.getCell(colFtmNotPaid).setCellStyle(grayHeaderStyle);
+        header.getCell(colFtmNotPaid).setCellStyle(yellowHeaderStyle);
 
         header.createCell(colClosingIntFinance).setCellValue("Closing Int (Finance)");
-        header.getCell(colClosingIntFinance).setCellStyle(grayHeaderStyle);
+        header.getCell(colClosingIntFinance).setCellStyle(yellowHeaderStyle);
 
         header.createCell(colClosingIntBusiness).setCellValue("Closing Interest (Business)");
-        header.getCell(colClosingIntBusiness).setCellStyle(grayHeaderStyle);
+        header.getCell(colClosingIntBusiness).setCellStyle(blueHeaderStyle);
 
         header.createCell(colDiffClosingInt).setCellValue("Diff Closing Int");
-        header.getCell(colDiffClosingInt).setCellStyle(grayHeaderStyle);
+        header.getCell(colDiffClosingInt).setCellStyle(yellowHeaderStyle);
 
         header.createCell(colRemarksClosingInt).setCellValue("Remarks Closing Int");
-        header.getCell(colRemarksClosingInt).setCellStyle(grayHeaderStyle);
+        header.getCell(colRemarksClosingInt).setCellStyle(yellowHeaderStyle);
 
         header.createCell(colOpeningOverdueIntOfPrevious).setCellValue("Opening Overdue Int of Previous");
-        header.getCell(colOpeningOverdueIntOfPrevious).setCellStyle(grayHeaderStyle);
+        header.getCell(colOpeningOverdueIntOfPrevious).setCellStyle(greenHeaderStyle);
 
         header.createCell(colOverdueCheck).setCellValue("Overdue Check");
-        header.getCell(colOverdueCheck).setCellStyle(grayHeaderStyle);
+        header.getCell(colOverdueCheck).setCellStyle(yellowHeaderStyle);
 
         header.createCell(colOverdueCheckRemarks).setCellValue("Overdue Check Remarks");
-        header.getCell(colOverdueCheckRemarks).setCellStyle(grayHeaderStyle);
+        header.getCell(colOverdueCheckRemarks).setCellStyle(yellowHeaderStyle);
 
         // Data rows (starting from row 2)
         int rowIdx = dataStartRow;
@@ -935,9 +947,9 @@ public class SSRSExcelExportService {
             Cell openingFuturePrincipalCell = row.createCell(colOpeningFuturePrincipal);
             Object afValue = getMetadataValue(ssrs, "bsItdBeginningLoanBalance90");
             setNumericCellValue(openingFuturePrincipalCell, afValue);
-            openingFuturePrincipalCell.setCellStyle(greenDataStyle);
+            openingFuturePrincipalCell.setCellStyle(greenRightDataStyle);
             
-            // AF (sandal, right-aligned) - sellerOpeningPos - sellerPrincipalOverdue
+            // AF (blue, right-aligned) - sellerOpeningPos - sellerPrincipalOverdue
             Cell afCell = row.createCell(colAF);
             if (payout != null) {
                 BigDecimal openingFuturePrincipal = safeSubtract(
@@ -946,55 +958,55 @@ public class SSRSExcelExportService {
                 );
                 setNumericCellValue(afCell, openingFuturePrincipal);
             } else {
-                afCell.setCellValue(0);
+                afCell.setCellFormula("ROUND(0,2)");
             }
-            afCell.setCellStyle(sandalDataStyle);
+            afCell.setCellStyle(blueDataStyle);
             
-            // Diff (sandal, right-aligned, formula) - Opening Future Principal - AF
+            // Diff (yellow, right-aligned, formula) - Opening Future Principal - AF
             Cell diffCell = row.createCell(colDiff);
             String openingFuturePrincipalCol = getColumnLetter(colOpeningFuturePrincipal);
             String afCol = getColumnLetter(colAF);
-            diffCell.setCellFormula(String.format("%s%d-%s%d", openingFuturePrincipalCol, rowIdx + 1, afCol, rowIdx + 1));
-            diffCell.setCellStyle(sandalDataStyle);
+            diffCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", openingFuturePrincipalCol, rowIdx + 1, afCol, rowIdx + 1)));
+            diffCell.setCellStyle(yellowDataStyle);
             
-            // Remarks for Diff (sandal, right-aligned, formula) - IF(ABS(Diff)>1,"Not Ok","Ok")
+            // Remarks for Diff (yellow background, centered, formula) - IF(ABS(Diff)>1,"Not Ok","Ok")
             Cell remarksDiffCell = row.createCell(colRemarksDiff);
             String diffCol = getColumnLetter(colDiff);
             remarksDiffCell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Not Ok\",\"Ok\")", diffCol, rowIdx + 1));
-            remarksDiffCell.setCellStyle(sandalDataStyle);
+            remarksDiffCell.setCellStyle(yellowCenterDataStyle);
             
-            // Opening interest Overdue (gray, right-aligned) - bsItBeginningInterestReceivable90
+            // Opening interest Overdue (green, right-aligned) - bsItBeginningInterestReceivable90
             Cell openingInterestOverdueCell = row.createCell(colOpeningInterestOverdue);
             Object openingInterestOverdueValue = getMetadataValue(ssrs, "bsItBeginningInterestReceivable90");
             setNumericCellValue(openingInterestOverdueCell, openingInterestOverdueValue);
-            openingInterestOverdueCell.setCellStyle(grayDataStyle);
+            openingInterestOverdueCell.setCellStyle(greenRightDataStyle);
             
-            // Closing Overdue (gray, right-aligned) - bsItdEndInterestReceivable90
+            // Closing Overdue (green, right-aligned) - bsItdEndInterestReceivable90
             Cell closingOverdueCell = row.createCell(colClosingOverdue);
             Object closingOverdueValue = getMetadataValue(ssrs, "bsItdEndInterestReceivable90");
             setNumericCellValue(closingOverdueCell, closingOverdueValue);
-            closingOverdueCell.setCellStyle(grayDataStyle);
+            closingOverdueCell.setCellStyle(greenRightDataStyle);
             
-            // Cut-Off Date (gray, right-aligned) - cycleEndDate
+            // Cut-Off Date (yellow background, centered) - cycleEndDate
             Cell cutOffDateCell = row.createCell(colCutOffDate);
             if (payout != null && payout.getCycleEndDate() != null) {
                 cutOffDateCell.setCellValue(payout.getCycleEndDate().toString());
             } else {
                 cutOffDateCell.setCellValue("");
             }
-            cutOffDateCell.setCellStyle(grayDataStyle);
+            cutOffDateCell.setCellStyle(yellowCenterDataStyle);
             
-            // No of days (gray, right-aligned) - calculate days between cycleStartDate and cycleEndDate
+            // No of days (yellow, right-aligned) - calculate days between cycleStartDate and cycleEndDate
             Cell noOfDaysCell = row.createCell(colNoOfDays);
             if (payout != null && payout.getCycleStartDate() != null && payout.getCycleEndDate() != null) {
                 long daysBetween = ChronoUnit.DAYS.between(payout.getCycleStartDate(), payout.getCycleEndDate());
-                noOfDaysCell.setCellValue(daysBetween);
+                noOfDaysCell.setCellFormula(String.format("ROUND(%d,2)", daysBetween));
             } else {
-                noOfDaysCell.setCellValue(0);
+                noOfDaysCell.setCellFormula("ROUND(0,2)");
             }
-            noOfDaysCell.setCellStyle(grayDataStyle);
+            noOfDaysCell.setCellStyle(yellowDataStyle);
             
-            // FTP - Interest DA (sandal, right-aligned, formula) - Weighted average from interest rate changes
+            // FTP - Interest DA (yellow, right-aligned, formula) - Weighted average from interest rate changes
             Cell ftpInterestDACell = row.createCell(colFTPInterestDA);
             String openingFuturePrincipalColForFTP = getColumnLetter(colOpeningFuturePrincipal);
             String ftpFormula = "0";
@@ -1008,10 +1020,10 @@ public class SSRSExcelExportService {
                     dealRate
                 );
             }
-            ftpInterestDACell.setCellFormula(ftpFormula);
-            ftpInterestDACell.setCellStyle(sandalDataStyle);
+            ftpInterestDACell.setCellFormula(wrapWithRound(ftpFormula));
+            ftpInterestDACell.setCellStyle(yellowDataStyle);
             
-            // Payout Report (light blue, right-aligned) - sellerTotalInterestComponentPaid - sellerInterestOverduePaid
+            // Payout Report (blue, right-aligned) - sellerTotalInterestComponentPaid - sellerInterestOverduePaid
             Cell payoutReportCell = row.createCell(colPayoutReport);
             if (payout != null) {
                 BigDecimal payoutReport = safeSubtract(
@@ -1020,93 +1032,93 @@ public class SSRSExcelExportService {
                 );
                 setNumericCellValue(payoutReportCell, payoutReport);
             } else {
-                payoutReportCell.setCellValue(0);
+                payoutReportCell.setCellFormula("ROUND(0,2)");
             }
-            payoutReportCell.setCellStyle(lightBlueDataStyle);
+            payoutReportCell.setCellStyle(blueDataStyle);
             
-            // Overdue Interest collection (light blue, right-aligned) - sellerInterestOverduePaid
+            // Overdue Interest collection (blue, right-aligned) - sellerInterestOverduePaid
             Cell overdueInterestCollectionCell = row.createCell(colOverdueInterestCollection);
             if (payout != null && payout.getSellerInterestOverduePaid() != null) {
                 setNumericCellValue(overdueInterestCollectionCell, payout.getSellerInterestOverduePaid());
             } else {
-                overdueInterestCollectionCell.setCellValue(0);
+                overdueInterestCollectionCell.setCellFormula("ROUND(0,2)");
             }
-            overdueInterestCollectionCell.setCellStyle(lightBlueDataStyle);
+            overdueInterestCollectionCell.setCellStyle(blueDataStyle);
             
-            // Total Payout (light blue, right-aligned, formula) - Payout Report + Overdue Interest collection
+            // Total Payout (blue, right-aligned, formula) - Payout Report + Overdue Interest collection
             Cell totalPayoutCell = row.createCell(colTotalPayout);
             String payoutReportCol = getColumnLetter(colPayoutReport);
             String overdueInterestCollectionCol = getColumnLetter(colOverdueInterestCollection);
-            totalPayoutCell.setCellFormula(String.format("%s%d+%s%d", 
-                payoutReportCol, rowIdx + 1, overdueInterestCollectionCol, rowIdx + 1));
-            totalPayoutCell.setCellStyle(lightBlueDataStyle);
+            totalPayoutCell.setCellFormula(wrapWithRound(String.format("%s%d+%s%d", 
+                payoutReportCol, rowIdx + 1, overdueInterestCollectionCol, rowIdx + 1)));
+            totalPayoutCell.setCellStyle(blueDataStyle);
             
-            // Difference Int Collection (gray, right-aligned, formula) - FTP - Interest DA - Total Payout
+            // Difference Int Collection (yellow, right-aligned, formula) - FTP - Interest DA - Total Payout
             Cell diff1Cell = row.createCell(colDiff1);
             String ftpInterestDACol = getColumnLetter(colFTPInterestDA);
             String totalPayoutCol = getColumnLetter(colTotalPayout);
-            diff1Cell.setCellFormula(String.format("%s%d-%s%d", ftpInterestDACol, rowIdx + 1, totalPayoutCol, rowIdx + 1));
-            diff1Cell.setCellStyle(grayDataStyle);
+            diff1Cell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", ftpInterestDACol, rowIdx + 1, totalPayoutCol, rowIdx + 1)));
+            diff1Cell.setCellStyle(yellowDataStyle);
             
-            // Remarks for Diff1 (gray, right-aligned, formula) - IF(ABS(Diff1)>1,"Not Ok","")
+            // Remarks for Diff1 (yellow background, centered, formula) - IF(ABS(Diff1)>1,"Not Ok","")
             Cell remarksDiff1Cell = row.createCell(colRemarksDiff1);
             String diff1Col = getColumnLetter(colDiff1);
             remarksDiff1Cell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Not Ok\",\"\")", diff1Col, rowIdx + 1));
-            remarksDiff1Cell.setCellStyle(grayDataStyle);
+            remarksDiff1Cell.setCellStyle(yellowCenterDataStyle);
 
-            // FTM NOT PAID: If Total Payout is 0 then use FTP - Interest DA, else 0
+            // FTM NOT PAID: If Payout Report is 0 then use FTP - Interest DA, else 0 (yellow)
             Cell ftmNotPaidCell = row.createCell(colFtmNotPaid);
-            String ftmFormula = String.format("IF(%s%d=0,%s%d,0)", totalPayoutCol, rowIdx + 1, ftpInterestDACol, rowIdx + 1);
-            ftmNotPaidCell.setCellFormula(ftmFormula);
-            ftmNotPaidCell.setCellStyle(grayDataStyle);
+            String ftmFormula = String.format("IF(%s%d=0,%s%d,0)", payoutReportCol, rowIdx + 1, ftpInterestDACol, rowIdx + 1);
+            ftmNotPaidCell.setCellFormula(wrapWithRound(ftmFormula));
+            ftmNotPaidCell.setCellStyle(yellowDataStyle);
 
-            // Closing Int Finance: (Opening Overdue Int of Previous) - (Overdue Interest collection) - (FTM NOT PAID)
+            // Closing Int Finance: (Opening Overdue Int of Previous) - (Overdue Interest collection) + (FTM NOT PAID) (yellow)
             Cell closingIntFinanceCell = row.createCell(colClosingIntFinance);
             String openingOverdueIntOfPreviousCol = getColumnLetter(colOpeningOverdueIntOfPrevious);
             String overdueCollectionCol = getColumnLetter(colOverdueInterestCollection);
-            String closingFinFormula = String.format("%s%d-%s%d-%s%d", openingOverdueIntOfPreviousCol, rowIdx + 1, overdueCollectionCol, rowIdx + 1, getColumnLetter(colFtmNotPaid), rowIdx + 1);
-            closingIntFinanceCell.setCellFormula(closingFinFormula);
-            closingIntFinanceCell.setCellStyle(grayDataStyle);
+            String closingFinFormula = String.format("%s%d-%s%d+%s%d", openingOverdueIntOfPreviousCol, rowIdx + 1, overdueCollectionCol, rowIdx + 1, getColumnLetter(colFtmNotPaid), rowIdx + 1);
+            closingIntFinanceCell.setCellFormula(wrapWithRound(closingFinFormula));
+            closingIntFinanceCell.setCellStyle(yellowDataStyle);
 
-            // Closing Interest Business: sellerTotalInterestDue - sellerTotalInterestComponentPaid
+            // Closing Interest Business: sellerTotalInterestDue - sellerTotalInterestComponentPaid (blue)
             Cell closingIntBusinessCell = row.createCell(colClosingIntBusiness);
             if (payout != null) {
                 BigDecimal businessValue = safeSubtract(payout.getSellerTotalInterestDue(), payout.getSellerTotalInterestComponentPaid());
                 setNumericCellValue(closingIntBusinessCell, businessValue);
             } else {
-                closingIntBusinessCell.setCellValue(0);
+                closingIntBusinessCell.setCellFormula("ROUND(0,2)");
             }
-            closingIntBusinessCell.setCellStyle(grayDataStyle);
+            closingIntBusinessCell.setCellStyle(blueDataStyle);
 
-            // Diff Closing Int: Closing Int Finance - Closing Interest Business
+            // Diff Closing Int: Closing Int Finance - Closing Interest Business (yellow)
             Cell diffClosingIntCell = row.createCell(colDiffClosingInt);
             String closingFinCol = getColumnLetter(colClosingIntFinance);
             String closingBizCol = getColumnLetter(colClosingIntBusiness);
-            diffClosingIntCell.setCellFormula(String.format("%s%d-%s%d", closingFinCol, rowIdx + 1, closingBizCol, rowIdx + 1));
-            diffClosingIntCell.setCellStyle(grayDataStyle);
+            diffClosingIntCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", closingFinCol, rowIdx + 1, closingBizCol, rowIdx + 1)));
+            diffClosingIntCell.setCellStyle(yellowDataStyle);
 
-            // Remarks Closing Int: if abs(diff) > 1 then "Mismatch"
+            // Remarks Closing Int: if abs(diff) > 1 then "Mismatch" (yellow)
             Cell remarksClosingIntCell = row.createCell(colRemarksClosingInt);
             String diffClosingCol = getColumnLetter(colDiffClosingInt);
             remarksClosingIntCell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Mismatch\",\"\")", diffClosingCol, rowIdx + 1));
-            remarksClosingIntCell.setCellStyle(grayDataStyle);
+            remarksClosingIntCell.setCellStyle(yellowCenterDataStyle);
 
-            // Opening Overdue Int of Previous: References "Opening interest Overdue" column
+            // Opening Overdue Int of Previous: References "Opening interest Overdue" column (green)
             Cell openingOverdueIntOfPreviousCell = row.createCell(colOpeningOverdueIntOfPrevious);
             String openingInterestOverdueCol = getColumnLetter(colOpeningInterestOverdue);
-            openingOverdueIntOfPreviousCell.setCellFormula(String.format("%s%d", openingInterestOverdueCol, rowIdx + 1));
-            openingOverdueIntOfPreviousCell.setCellStyle(grayDataStyle);
+            openingOverdueIntOfPreviousCell.setCellFormula(wrapWithRound(String.format("%s%d", openingInterestOverdueCol, rowIdx + 1)));
+            openingOverdueIntOfPreviousCell.setCellStyle(greenRightDataStyle);
 
-            // Overdue Check: (Opening Overdue Int of Previous) - (Overdue Interest collection)
+            // Overdue Check: (Opening Overdue Int of Previous) - (Overdue Interest collection) (yellow)
             Cell overdueCheckCell = row.createCell(colOverdueCheck);
-            overdueCheckCell.setCellFormula(String.format("%s%d-%s%d", openingOverdueIntOfPreviousCol, rowIdx + 1, overdueCollectionCol, rowIdx + 1));
-            overdueCheckCell.setCellStyle(grayDataStyle);
+            overdueCheckCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", openingOverdueIntOfPreviousCol, rowIdx + 1, overdueCollectionCol, rowIdx + 1)));
+            overdueCheckCell.setCellStyle(yellowDataStyle);
 
-            // Overdue Check Remarks: if > 0 then "Error"
+            // Overdue Check Remarks: if > 0 then "Error" (yellow)
             Cell overdueCheckRemarksCell = row.createCell(colOverdueCheckRemarks);
             String overdueCheckCol = getColumnLetter(colOverdueCheck);
             overdueCheckRemarksCell.setCellFormula(String.format("IF(%s%d>0,\"Error\",\"\")", overdueCheckCol, rowIdx + 1));
-            overdueCheckRemarksCell.setCellStyle(grayDataStyle);
+            overdueCheckRemarksCell.setCellStyle(yellowCenterDataStyle);
             
             rowIdx++;
         }

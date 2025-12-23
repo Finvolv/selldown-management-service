@@ -32,6 +32,7 @@ import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.Month;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -243,22 +244,27 @@ public class LoanDetailController {
                         "message", "No payout details found"
                     )));
                 }
-
-                String filename = String.format("partner-payout-%d-%d-%d-%d.xlsx", dealId, partnerId, year, month);
                 
-                return excelExportService.buildPartnerPayoutReport(payouts, dealId, partnerId)
-                        .flatMap(bytes -> {
-                            if (Boolean.TRUE.equals(upload)) {
-                                if (authorization == null || authorization.isBlank()) {
-                                    return Mono.just(ResponseEntity.badRequest().body(Map.of(
-                                        "success", false,
-                                        "message", "Authorization header is required for upload=true"
-                                    )));
-                                }
+                return partnerPayoutDetailsAllService.getDealById(dealId)
+                    .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
+                        .flatMap(partnerName -> {
+                            String dealName = sanitizeForFilename(deal.getName());
+                            String sanitizedPartnerName = sanitizeForFilename(partnerName);
+                            String monthName = getMonthName(month);
+                            String filename = String.format("partner-payout-%s-%s-%d-%s.xlsx", 
+                                dealName, sanitizedPartnerName, year, monthName);
+                            
+                            return excelExportService.buildPartnerPayoutReport(payouts, dealId, partnerId)
+                                .flatMap(bytes -> {
+                                    if (Boolean.TRUE.equals(upload)) {
+                                        if (authorization == null || authorization.isBlank()) {
+                                            return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                                                "success", false,
+                                                "message", "Authorization header is required for upload=true"
+                                            )));
+                                        }
 
-                                return partnerPayoutDetailsAllService.getDealById(dealId)
-                                    .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
-                                        .flatMap(partnerName -> documentUploadService.generateUploadId(authorization, partnerName, deal.getName(), year, month)
+                                        return documentUploadService.generateUploadId(authorization, partnerName, deal.getName(), year, month)
                                             .flatMap(generatedId -> documentUploadService.uploadExcel(authorization, generatedId, bytes, filename)
                                                 .then(
                                                     monthlyDealProcessingStatusRepository
@@ -273,24 +279,25 @@ public class LoanDetailController {
                                                     "success", true,
                                                     "generatedId", generatedId,
                                                     "message", "File uploaded successfully"
-                                                ))))));
-                            }
+                                                ))));
+                                    }
 
-                            // Update status to PAYOUT_FILE_GENERATED for successful generation (download flow)
-                            return monthlyDealProcessingStatusRepository
-                                .findByDealIdAndPartnerIdAndYearAndMonth(dealId, partnerId, year, month)
-                                .flatMap(status -> {
-                                    status.setStatus(MonthlyDealStatus.PAYOUT_FILE_GENERATED);
-                                    status.setModifiedAt(LocalDateTime.now());
-                                    return monthlyDealProcessingStatusRepository.save(status);
-                                })
-                                .then(Mono.fromSupplier(() ->
-                                    ResponseEntity.ok()
-                                        .header("Content-Disposition", "attachment; filename=" + filename)
-                                        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                                        .body(bytes)
-                                ));
-                        });
+                                    // Update status to PAYOUT_FILE_GENERATED for successful generation (download flow)
+                                    return monthlyDealProcessingStatusRepository
+                                        .findByDealIdAndPartnerIdAndYearAndMonth(dealId, partnerId, year, month)
+                                        .flatMap(status -> {
+                                            status.setStatus(MonthlyDealStatus.PAYOUT_FILE_GENERATED);
+                                            status.setModifiedAt(LocalDateTime.now());
+                                            return monthlyDealProcessingStatusRepository.save(status);
+                                        })
+                                        .then(Mono.fromSupplier(() ->
+                                            ResponseEntity.ok()
+                                                .header("Content-Disposition", "attachment; filename=" + filename)
+                                                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                                                .body(bytes)
+                                        ));
+                                });
+                        }));
             });
     }
 
@@ -351,39 +358,45 @@ public class LoanDetailController {
                             )));
                         }
                         
-                        String filename = String.format("ssrs-finance-%d-%d-%d-%d.xlsx", dealId, partnerId, year, month);
-                        
-                        // Step 4: Generate Excel
-                        return ssrsExcelExportService.buildSSRSReport(matchedSSRSData, year, month, dealId)
-                            .flatMap(bytes -> {
-                                if (Boolean.TRUE.equals(upload)) {
-                                    if (authorization == null || authorization.isBlank()) {
-                                        return Mono.just(ResponseEntity.badRequest().body(Map.of(
-                                            "success", false,
-                                            "message", "Authorization header is required for upload=true"
-                                        )));
-                                    }
+                        // Step 4: Generate Excel - Get deal and partner names for filename
+                        return partnerPayoutDetailsAllService.getDealById(dealId)
+                            .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
+                                .flatMap(partnerName -> {
+                                    String dealName = sanitizeForFilename(deal.getName());
+                                    String sanitizedPartnerName = sanitizeForFilename(partnerName);
+                                    String monthName = getMonthName(month);
+                                    String filename = String.format("ssrs-finance-%s-%s-%d-%s.xlsx", 
+                                        dealName, sanitizedPartnerName, year, monthName);
+                                    
+                                    return ssrsExcelExportService.buildSSRSReport(matchedSSRSData, year, month, dealId)
+                                        .flatMap(bytes -> {
+                                            if (Boolean.TRUE.equals(upload)) {
+                                                if (authorization == null || authorization.isBlank()) {
+                                                    return Mono.just(ResponseEntity.badRequest().body(Map.of(
+                                                        "success", false,
+                                                        "message", "Authorization header is required for upload=true"
+                                                    )));
+                                                }
 
-                                    return partnerPayoutDetailsAllService.getDealById(dealId)
-                                        .flatMap(deal -> customerNameFromDeal(deal.getCustomerId())
-                                            .flatMap(partnerName -> documentUploadService.generateUploadIdForFinance(
-                                                    authorization, partnerName, deal.getName(), year, month)
-                                                .flatMap(generatedId -> documentUploadService.uploadExcel(authorization, generatedId, bytes, filename)
-                                                    .thenReturn(ResponseEntity.ok(Map.of(
-                                                        "success", true,
-                                                        "generatedId", generatedId,
-                                                        "message", "SSRS finance file uploaded successfully"
-                                                    ))))));
-                                }
+                                                return documentUploadService.generateUploadIdForFinance(
+                                                        authorization, partnerName, deal.getName(), year, month)
+                                                    .flatMap(generatedId -> documentUploadService.uploadExcel(authorization, generatedId, bytes, filename)
+                                                        .thenReturn(ResponseEntity.ok(Map.of(
+                                                            "success", true,
+                                                            "generatedId", generatedId,
+                                                            "message", "SSRS finance file uploaded successfully"
+                                                        ))));
+                                            }
 
-                                // Download flow
-                                return Mono.fromSupplier(() ->
-                                    ResponseEntity.ok()
-                                        .header("Content-Disposition", "attachment; filename=" + filename)
-                                        .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
-                                        .body(bytes)
-                                );
-                            });
+                                            // Download flow
+                                            return Mono.fromSupplier(() ->
+                                                ResponseEntity.ok()
+                                                    .header("Content-Disposition", "attachment; filename=" + filename)
+                                                    .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                                                    .body(bytes)
+                                            );
+                                        });
+                                }));
                     });
             })
             .doOnError(error -> logger.error("Error generating SSRS Excel - dealId: {}, partnerId: {}, year: {}, month: {}: {}", 
@@ -395,6 +408,17 @@ public class LoanDetailController {
     private Mono<String> customerNameFromDeal(Long customerId) {
         return customerRepository.findById(customerId)
             .map(c -> c.getName());
+    }
+
+    private String getMonthName(int month) {
+        return Month.of(month).name().substring(0, 3);
+    }
+
+    private String sanitizeForFilename(String name) {
+        if (name == null) {
+            return "";
+        }
+        return name.replaceAll("[^a-zA-Z0-9_-]", "_").replaceAll("_+", "_");
     }
 
     private Mono<ExcelGenerationResponse> generateExcelData(Long dealId, Long partnerId, Integer year, Integer month) {
