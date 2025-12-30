@@ -23,14 +23,15 @@
         <openapi.version>2.2.0</openapi.version>
         <testcontainer.version>1.20.0</testcontainer.version>
         <awaitility.version>4.2.0</awaitility.version>
-        <spring.web.version>6.1.20</spring.web.version>
-        <spring.security.version>6.4.6</spring.security.version>
-        <kafka.clients.version>3.9.1</kafka.clients.version>
-        <netty.version>4.1.122.Final</netty.version>
+        <spring.web.version>6.1.21</spring.web.version>
+        <spring.security.version>6.4.9</spring.security.version>
+<!--        <kafka.clients.version>3.9.1</kafka.clients.version>-->
+        <netty.version>4.1.125.Final</netty.version>
         <json.smart.version>2.5.2</json.smart.version>
         <kotlin.stdlib.version>2.1.0</kotlin.stdlib.version>
         <json.version>20250517</json.version>
         <commons.io.version>2.14.0</commons.io.version>
+        <poi.version>5.3.0</poi.version>
     </properties>
 
     <dependencies>
@@ -170,11 +171,11 @@
             <artifactId>spring-security-core</artifactId>
             <version>${spring.security.version}</version>
         </dependency>
-        <dependency>
-            <groupId>org.apache.kafka</groupId>
-            <artifactId>kafka-clients</artifactId>
-            <version>${kafka.clients.version}</version>
-        </dependency>
+<!--        <dependency>-->
+<!--            <groupId>org.apache.kafka</groupId>-->
+<!--            <artifactId>kafka-clients</artifactId>-->
+<!--            <version>${kafka.clients.version}</version>-->
+<!--        </dependency>-->
         <dependency>
             <groupId>io.netty</groupId>
             <artifactId>netty-handler</artifactId>
@@ -214,12 +215,12 @@
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi</artifactId>
-            <version>5.2.5</version>
+            <version>${poi.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.poi</groupId>
             <artifactId>poi-ooxml</artifactId>
-            <version>5.2.5</version>
+            <version>${poi.version}</version>
         </dependency>
     </dependencies>
 
