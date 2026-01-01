@@ -24,7 +24,7 @@
         <testcontainer.version>1.20.0</testcontainer.version>
         <awaitility.version>4.2.0</awaitility.version>
         <spring.web.version>6.2.11</spring.web.version>
-        <spring.security.version>6.4.10</spring.security.version>
+        <spring.security.version>6.5.7</spring.security.version>
 <!--        <kafka.clients.version>3.9.1</kafka.clients.version>-->
         <netty.version>4.1.129.Final</netty.version>
         <json.smart.version>2.5.2</json.smart.version>
