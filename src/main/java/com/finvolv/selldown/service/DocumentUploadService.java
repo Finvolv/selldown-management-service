@@ -4,12 +4,15 @@ import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
+import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
+import reactor.netty.http.client.HttpClient;
 
+import java.time.Duration;
 import java.util.Map;
 
 @Service
@@ -20,7 +23,16 @@ public class DocumentUploadService {
 
     public DocumentUploadService(WebClient.Builder builder, @Value("${documentService.baseUrl}") String baseUrl) {
         this.documentServiceBaseUrl = baseUrl;
-        this.webClient = builder.baseUrl(baseUrl).build();
+        this.webClient = builder
+            .baseUrl(baseUrl)
+            .codecs(configurer -> {
+                configurer.defaultCodecs().maxInMemorySize(50 * 1024 * 1024); // 50MB
+            })
+            .clientConnector(new ReactorClientHttpConnector(
+                HttpClient.create()
+                    .responseTimeout(Duration.ofSeconds(60)) // 60 seconds timeout
+            ))
+            .build();
     }
 
     public Mono<String> generateUploadId(String authorizationBearerToken,
