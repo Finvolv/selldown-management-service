@@ -6,8 +6,9 @@ spring:
   application:
     name: selldown-management-service
   codec:
-    # Increase default in-memory buffer limit (default is 256KB) to handle large JSON payloads
-    max-in-memory-size: 50MB
+    max-in-memory-size: 50MB  # Increased buffer size for large Excel files
+  webflux:
+    max-buffer-memory: 50MB
 
   r2dbc:
     url: r2dbc:postgresql://localhost:5432/merge_excel_9
