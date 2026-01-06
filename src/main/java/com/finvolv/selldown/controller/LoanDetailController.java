@@ -38,7 +38,6 @@ import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/loan-details")
-@CrossOrigin(origins = "*")
 @RequiredArgsConstructor
 public class LoanDetailController {
 

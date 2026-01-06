@@ -17,7 +17,6 @@ import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/deals")
-@CrossOrigin(origins = "*")
 public class DealController {
 
     @Autowired

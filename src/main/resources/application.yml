@@ -48,4 +48,10 @@ user:
       password: ${USER_DATA_ADMIN_PASSWORD:admin}
       mobileNumber: ${USER_DATA_ADMIN_MOBILE_NUMBER:admin@uam.com}
 
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://localhost:8080}
+  allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,DELETE,PATCH,OPTIONS}
+  allowed-headers: ${CORS_ALLOWED_HEADERS:*}
+  allow-credentials: ${CORS_ALLOW_CREDENTIALS:true}
+  max-age: ${CORS_MAX_AGE:3600}
 
