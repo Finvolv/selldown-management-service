@@ -28,7 +28,7 @@
 <!--        <kafka.clients.version>3.9.1</kafka.clients.version>-->
         <netty.version>4.1.129.Final</netty.version>
         <json.smart.version>2.5.2</json.smart.version>
-        <kotlin.stdlib.version>2.1.0</kotlin.stdlib.version>
+        <kotlin.stdlib.version>2.2.21</kotlin.stdlib.version>
         <json.version>20250517</json.version>
         <commons.io.version>2.14.0</commons.io.version>
         <poi.version>5.5.1</poi.version>
