@@ -21,7 +21,7 @@ public class DocumentUploadService {
     private final WebClient webClient;
     private final String documentServiceBaseUrl;
 
-    public DocumentUploadService(WebClient.Builder builder, @Value("${documentService.baseUrl}") String baseUrl) {
+    public DocumentUploadService(WebClient.Builder builder, @Value("${documentService.baseUrlLoanTracking}") String baseUrl) {
         this.documentServiceBaseUrl = baseUrl;
         this.webClient = builder
             .baseUrl(baseUrl)
