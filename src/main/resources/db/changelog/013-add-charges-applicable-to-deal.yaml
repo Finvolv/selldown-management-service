@@ -1,0 +1,21 @@
+databaseChangeLog:
+  - changeSet:
+      id: 013-add-charges-applicable-to-deal
+      author: system
+      changes:
+        - addColumn:
+            tableName: "sd-deal"
+            columns:
+              - column:
+                  name: charges_applicable
+                  type: BOOLEAN
+                  defaultValueBoolean: false
+                  constraints:
+                    nullable: false
+      preConditions:
+        - onFail: MARK_RAN
+        - not:
+            - columnExists:
+                tableName: "sd-deal"
+                columnName: "charges_applicable"
+

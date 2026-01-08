@@ -54,6 +54,8 @@ public class Deal {
     @Max(value = 31, message = "Month on month day must be at most 31")
     protected Integer monthOnMonthDay;
 
+    protected Boolean chargesApplicable;
+
     public enum DealStatus {
         PENDING, IN_PROGRESS, COMPLETED, CANCELLED
     }

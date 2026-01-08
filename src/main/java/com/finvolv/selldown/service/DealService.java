@@ -36,6 +36,7 @@ public class DealService {
             return Mono.error(new IllegalArgumentException("Deal type must be specified"));
         }
         deal.setAdditionalInfo(deal.getAdditionalInfo()==null? new HashMap<>() : new HashMap<>(deal.getAdditionalInfo()));
+        deal.setChargesApplicable(deal.getChargesApplicable() == null ? false : deal.getChargesApplicable());
         deal.setCreatedAt(new Timestamp(System.currentTimeMillis()));
         deal.setCreatedBy(createdBy);
         deal.setUpdatedAt(new Timestamp(System.currentTimeMillis()));
@@ -64,14 +65,20 @@ public class DealService {
             return Mono.error(new IllegalArgumentException("Deal type must be specified"));
         }
         return dealRepository.findById(id)
-                .map(existing -> deal.toBuilder()
-                        .id(existing.getId())
-                        .additionalInfo(deal.getAdditionalInfo()==null? new HashMap<>() : new HashMap<>(deal.getAdditionalInfo()))
-                        .createdAt(existing.getCreatedAt())
-                        .createdBy(existing.getCreatedBy())
-                        .updatedAt(new Timestamp(System.currentTimeMillis()))
-                        .updatedBy(updatedBy)
-                        .build())
+                .map(existing -> {
+                    var builder = deal.toBuilder()
+                            .id(existing.getId())
+                            .additionalInfo(deal.getAdditionalInfo()==null? new HashMap<>() : new HashMap<>(deal.getAdditionalInfo()))
+                            .createdAt(existing.getCreatedAt())
+                            .createdBy(existing.getCreatedBy())
+                            .updatedAt(new Timestamp(System.currentTimeMillis()))
+                            .updatedBy(updatedBy);
+                    // Set default value if chargesApplicable is null
+                    if (deal.getChargesApplicable() == null) {
+                        builder.chargesApplicable(false);
+                    }
+                    return builder.build();
+                })
                 .flatMap(dealRepository::save);
     }
 

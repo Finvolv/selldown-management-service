@@ -32,6 +32,7 @@ public class DealDto {
     private Timestamp updatedAt;
     private List<InterestRateChange> interestRateTable;
     private Integer monthOnMonthDay;
+    private Boolean chargesApplicable;
 }
 
 

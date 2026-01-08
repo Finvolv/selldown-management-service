@@ -38,15 +38,24 @@ public class ExcelExportService {
     }
 
     public Mono<byte[]> buildPartnerPayoutReport(List<PartnerPayoutDetailsAll> payouts, Long dealId, Long partnerId) {
-        // Fetch deal to get the deal rate
-        // Use a sentinel value to represent null, then convert back to null in the zip
-        Mono<Double> dealRateMono = dealId != null
+        // Fetch deal once to get both deal rate and chargesApplicable flag
+        Mono<com.finvolv.selldown.model.Deal> dealMono = dealId != null
                 ? partnerPayoutDetailsAllService.getDealById(dealId)
-                        .map(deal -> deal != null && deal.getAnnualInterestRate() != null 
-                                ? deal.getAnnualInterestRate() 
-                                : Double.NaN) // Use NaN as sentinel for null
-                        .defaultIfEmpty(Double.NaN) // Use NaN as sentinel for empty
-                : Mono.just(Double.NaN); // Use NaN as sentinel for null
+                        .switchIfEmpty(Mono.fromCallable(() -> (com.finvolv.selldown.model.Deal) null))
+                : Mono.fromCallable(() -> (com.finvolv.selldown.model.Deal) null);
+
+        // Extract both deal rate and chargesApplicable from deal in a single operation
+        Mono<java.util.AbstractMap.SimpleEntry<Double, Boolean>> dealInfoMono = dealMono
+                .map(deal -> {
+                    Double dealRate = deal != null && deal.getAnnualInterestRate() != null 
+                            ? deal.getAnnualInterestRate() 
+                            : Double.NaN; // Use NaN as sentinel for null
+                    Boolean chargesApplicable = deal != null && deal.getChargesApplicable() != null 
+                            ? deal.getChargesApplicable() 
+                            : false; // Default to false if null
+                    return new java.util.AbstractMap.SimpleEntry<>(dealRate, chargesApplicable);
+                })
+                .defaultIfEmpty(new java.util.AbstractMap.SimpleEntry<>(Double.NaN, false));
 
         // Fetch loan details to get Customer ROI (currentInterestRate) mapped by lmsLan
         Mono<Map<String, Double>> customerRoiMapMono = (dealId != null && partnerId != null)
@@ -67,20 +76,22 @@ public class ExcelExportService {
                         .defaultIfEmpty(new LinkedHashMap<>())
                 : Mono.just(new LinkedHashMap<>());
 
-        // Combine both reactive operations and build the Excel file
-        return Mono.zip(dealRateMono, customerRoiMapMono)
+        // Combine all reactive operations and build the Excel file
+        return Mono.zip(dealInfoMono, customerRoiMapMono)
                 .map(tuple -> {
-                    Double dealRate = tuple.getT1();
+                    java.util.AbstractMap.SimpleEntry<Double, Boolean> dealInfo = tuple.getT1();
+                    Double dealRate = dealInfo.getKey();
                     // Convert NaN sentinel back to null
                     if (dealRate != null && dealRate.isNaN()) {
                         dealRate = null;
                     }
+                    Boolean chargesApplicable = dealInfo.getValue();
                     Map<String, Double> customerRoiMap = tuple.getT2();
                     
                     try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                         Sheet sheet = workbook.createSheet("Partner Payout Report");
 
-                        Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> columns = buildColumns(dealRate, customerRoiMap);
+                        Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> columns = buildColumns(dealRate, customerRoiMap, chargesApplicable);
                         
                         // Create cell styles for gray and yellow backgrounds with bold font for header
                         XSSFFont boldFont = workbook.createFont();
@@ -191,7 +202,7 @@ public class ExcelExportService {
                 });
     }
 
-    private Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> buildColumns(Double dealRate, Map<String, Double> customerRoiMap) {
+    private Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> buildColumns(Double dealRate, Map<String, Double> customerRoiMap, Boolean chargesApplicable) {
         Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> cols = new LinkedHashMap<>();
 
         // Non-seller
@@ -224,8 +235,13 @@ public class ExcelExportService {
         cols.put("Closing Total Overdues", p -> safeAdd(
                 safeSubtract(p.getTotalPrincipalDue(), p.getTotalPrincipalComponentPaid()),
                 safeSubtract(p.getTotalInterestDue(), p.getTotalInterestComponentPaid())));
-        cols.put("Foreclosure charges received (Exc of GST)", PartnerPayoutDetailsAll::getForeclosureChargesPaid);
-        cols.put("Bounce charges received (Exc of GST)", p -> safeSubtract(p.getTotalChargesPaid(), p.getForeclosureChargesPaid()));
+        
+        // Only add charges columns if chargesApplicable is true
+        if (Boolean.TRUE.equals(chargesApplicable)) {
+            cols.put("Foreclosure charges received (Exc of GST)", PartnerPayoutDetailsAll::getForeclosureChargesPaid);
+            cols.put("Bounce charges received (Exc of GST)", p -> safeSubtract(p.getTotalChargesPaid(), p.getForeclosureChargesPaid()));
+        }
+        
         cols.put("Closing DPD", PartnerPayoutDetailsAll::getClosingDpd);
         cols.put("Total Collections (EMI+Overdue+Part+F.C)", PartnerPayoutDetailsAll::getTotalPaid);
         cols.put("Closing Future POS (excluding Principal overdues)", p -> {
@@ -258,8 +274,13 @@ public class ExcelExportService {
         cols.put("Principal O/d collection", PartnerPayoutDetailsAll::getSellerPrincipalOverduePaid);
         cols.put("Overdue Interest  collection", PartnerPayoutDetailsAll::getSellerInterestOverduePaid);
         cols.put("Pre Payment",p -> safeAdd(p.getSellerForeclosurePaid(),p.getSellerPrepaymentPaid()));
-        cols.put("Bounce Charges", p -> safeSubtract(p.getSellerTotalChargesPaid(), p.getSellerForeclosureChargesPaid()));
-        cols.put("FC Charges", PartnerPayoutDetailsAll::getSellerForeclosureChargesPaid);
+        
+        // Only add seller charges columns if chargesApplicable is true
+        if (Boolean.TRUE.equals(chargesApplicable)) {
+            cols.put("Bounce Charges", p -> safeSubtract(p.getSellerTotalChargesPaid(), p.getSellerForeclosureChargesPaid()));
+            cols.put("FC Charges", PartnerPayoutDetailsAll::getSellerForeclosureChargesPaid);
+        }
+        
         cols.put("Closing Future POS (excluding Principal overdues).",  p -> safeSubtract(p.getSellerClosingPos(), safeSubtract(p.getSellerTotalPrincipalDue(),p.getSellerTotalPrincipalComponentPaid())));
         cols.put("Total Collections (EMI+Overdue+Part+F.C).", PartnerPayoutDetailsAll::getSellerTotalPaid);
         cols.put("Closing Overdue Interest",p -> safeSubtract(p.getSellerTotalInterestDue(),p.getSellerTotalInterestComponentPaid()));

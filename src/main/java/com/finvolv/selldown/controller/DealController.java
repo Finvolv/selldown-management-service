@@ -67,6 +67,7 @@ public class DealController {
                                         .updatedAt(deal.getUpdatedAt())
                                         .interestRateTable(interestRateChanges)
                                         .monthOnMonthDay(deal.getMonthOnMonthDay())
+                                        .chargesApplicable(deal.getChargesApplicable())
                                         .build())
                 );
     }
