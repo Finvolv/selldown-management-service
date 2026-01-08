@@ -258,6 +258,9 @@ public class ExcelExportService {
 
         // Seller Fields
         cols.put("Opening POS ( Without overdue) Sell down", p -> safeSubtract(p.getSellerOpeningPos(), p.getSellerPrincipalOverdue()));
+
+        cols.put("Principal Due for the current month", p -> safeSubtract(p.getSellerTotalPrincipalDue(), p.getSellerPrincipalOverdue()));
+        cols.put("Interest Due for the month", p -> safeSubtract(p.getSellerTotalInterestDue(), p.getSellerInterestOverdue()));
         cols.put("Principal", p -> safeSubtract(p.getSellerTotalPrincipalComponentPaid(), p.getSellerPrincipalOverduePaid()));
         cols.put("Interest", p -> {
             BigDecimal totalPaid = p.getSellerTotalInterestComponentPaid();
