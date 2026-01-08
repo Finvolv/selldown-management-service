@@ -9,8 +9,10 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -61,6 +63,9 @@ public class LoanDetail {
     @Builder.Default
     @Column("loan_age")
     private Integer loanAge = 0;
+    
+    @Column("assigned_interest_overdue_split")
+    private List<BigDecimal> assignedInterestOverdueSplit;
     
     @Column("created_at")
     private LocalDateTime createdAt;

@@ -287,6 +287,7 @@ public class ExcelExportService {
         cols.put("Closing Future POS (excluding Principal overdues).",  p -> safeSubtract(p.getSellerClosingPos(), safeSubtract(p.getSellerTotalPrincipalDue(),p.getSellerTotalPrincipalComponentPaid())));
         cols.put("Total Collections (EMI+Overdue+Part+F.C).", PartnerPayoutDetailsAll::getSellerTotalPaid);
         cols.put("Closing Overdue Interest",p -> safeSubtract(p.getSellerTotalInterestDue(),p.getSellerTotalInterestComponentPaid()));
+        cols.put("Future interest overdues", PartnerPayoutDetailsAll::getSellerInterestOverdueSplit);
         //  Need to find logic
 
         return cols;

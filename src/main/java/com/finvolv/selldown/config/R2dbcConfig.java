@@ -1,7 +1,9 @@
 package com.finvolv.selldown.config;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.finvolv.selldown.mapper.PostgresJsonToListConverter;
 import com.finvolv.selldown.mapper.PostgresJsonToMapConverter;
+import com.finvolv.selldown.mapper.PostgresListToJsonConverter;
 import com.finvolv.selldown.mapper.PostgresMapToJsonConverter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -19,7 +21,9 @@ public class R2dbcConfig {
         var dialect = DialectResolver.getDialect(databaseClient.getConnectionFactory());
         return R2dbcCustomConversions.of(dialect, Arrays.asList(
                 new PostgresJsonToMapConverter(objectMapper),
-                new PostgresMapToJsonConverter(objectMapper)
+                new PostgresMapToJsonConverter(objectMapper),
+                new PostgresJsonToListConverter(objectMapper),
+                new PostgresListToJsonConverter(objectMapper)
         ));
     }
 }

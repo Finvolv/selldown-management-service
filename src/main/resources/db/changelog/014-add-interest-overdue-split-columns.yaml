@@ -1,0 +1,26 @@
+databaseChangeLog:
+  - changeSet:
+      id: 014-01-add-assigned-interest-overdue-split-to-loan-details
+      author: system
+      changes:
+        - addColumn:
+            tableName: "sd-loan_details"
+            columns:
+              - column:
+                  name: assigned_interest_overdue_split
+                  type: JSONB
+                  constraints:
+                    nullable: true
+  - changeSet:
+      id: 014-02-add-seller-interest-overdue-split-to-payout-details
+      author: system
+      changes:
+        - addColumn:
+            tableName: "sd-partner_payout_details_all"
+            columns:
+              - column:
+                  name: seller_interest_overdue_split
+                  type: JSONB
+                  constraints:
+                    nullable: true
+

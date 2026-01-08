@@ -11,6 +11,7 @@ import org.springframework.data.relational.core.mapping.Table;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -131,6 +132,9 @@ public class PartnerPayoutDetailsAll {
     
     @Column("seller_closing_dpd")
     private Integer sellerClosingDpd;
+    
+    @Column("seller_interest_overdue_split")
+    private List<BigDecimal> sellerInterestOverdueSplit;
     
     @Column("lms_id")
     private Long lmsId;

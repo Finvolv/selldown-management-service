@@ -1,5 +1,6 @@
 package com.finvolv.selldown.service;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.finvolv.selldown.model.Deal;
 import com.finvolv.selldown.model.LoanDetail;
 import com.finvolv.selldown.model.MonthlyDealProcessingStatus;
@@ -29,6 +30,7 @@ public class LoanDetailService {
     private final LoanDetailRepository loanDetailRepository;
     private final DealRepository dealRepository;
     private final MonthlyDealProcessingStatusRepository monthlyDealProcessingStatusRepository;
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record LoanDetailInputForDeal(
         Double currentPOS,
         String lmsLAN,
@@ -39,7 +41,8 @@ public class LoanDetailService {
         LoanDetail.LoanType loanType,
         Integer loanStartedDate,
         Integer loanAge,
-        Double currentInterestRate
+        Double currentInterestRate,
+        java.util.List<java.math.BigDecimal> assignedInterestOverdueSplit
     ) {
         public LoanDetailInputForDeal {
             if (lmsLAN == null || currentPOS == null || currentInterestRate == null || status == null) {
@@ -48,6 +51,7 @@ public class LoanDetailService {
         }
     }
 
+    @JsonIgnoreProperties(ignoreUnknown = true)
     public record LoanDetailInputForPartner(
         String dealName,
         String lmsLAN,
@@ -59,7 +63,8 @@ public class LoanDetailService {
         Integer currentDpd,
         LoanDetail.LoanType loanType,
         String loanStartedDate,
-        Integer loanAge
+        Integer loanAge,
+        java.util.List<java.math.BigDecimal> assignedInterestOverdueSplit
     ) {
         public LoanDetailInputForPartner {
             if (dealName == null || lmsLAN == null || currentPOS == null || 
@@ -182,6 +187,7 @@ public class LoanDetailService {
             .loanStartedDate(input.loanStartedDate() != null ? input.loanStartedDate().toString() : null)
             .loanType(input.loanType())
             .loanAge(input.loanAge())
+            .assignedInterestOverdueSplit(input.assignedInterestOverdueSplit() != null ? input.assignedInterestOverdueSplit() : java.util.Collections.emptyList())
             .createdAt(now)
             .modifiedAt(now)
             .build();
@@ -302,6 +308,7 @@ public class LoanDetailService {
             .loanType(input.loanType())
             .loanStartedDate(input.loanStartedDate())
             .loanAge(input.loanAge())
+            .assignedInterestOverdueSplit(input.assignedInterestOverdueSplit() != null ? input.assignedInterestOverdueSplit() : java.util.Collections.emptyList())
             .createdAt(LocalDateTime.now())
             .modifiedAt(LocalDateTime.now())
             .build();
