@@ -493,15 +493,11 @@ public class PartnerPayoutDetailsAllService {
                             payoutDetail.setSellerInterestOverdueSplit(newSplitArray);
                         }
                         
-                        // Now calculate sellerInterestOverdue
+                        // Now calculate sellerInterestOverdue (initial calculation, will be updated based on array)
                         return calculateSellerInterestOverdueReactive(payoutDetail, loanDetail, year, month)
                             .map(sellerInterestOverdue -> {
+                                // Note: sellerInterestOverdue will be recalculated later based on array total
                                 payoutDetail.setSellerInterestOverdue(sellerInterestOverdue);
-                                
-                                // Calculate sellerTotalInterestDue = calculatedInterest + sellerInterestOverdue
-                                BigDecimal sellerTotalInterestDue = calculatedInterest.add(sellerInterestOverdue)
-                                    .setScale(2, RoundingMode.HALF_UP);
-                                payoutDetail.setSellerTotalInterestDue(sellerTotalInterestDue);
                                 
                                 // Get values needed for calculations
                                 BigDecimal totalInterestComponentPaid = payoutDetail.getTotalInterestComponentPaid() != null ? 
@@ -509,87 +505,158 @@ public class PartnerPayoutDetailsAllService {
                                 BigDecimal interestOverduePaid = payoutDetail.getInterestOverduePaid() != null ? 
                                     payoutDetail.getInterestOverduePaid() : BigDecimal.ZERO;
 
+                                // ====================================================================
+                                // COMPLETE LOGIC FOR SELLER INTEREST OVERDUE SPLIT ARRAY MANAGEMENT
+                                // ====================================================================
                                 
-                                // Calculate sellerInterestOverduePaid based on DPD and interest overdue split:
-                                // If sellerInterestOverdue > 0 and split array is available:
-                                //   - DPD 0-30: use array[1] (second value, 0-indexed)
-                                //   - DPD 31-60: use array[2] (third value, 0-indexed)
-                                BigDecimal sellerInterestOverduePaid = BigDecimal.ZERO;
+                                // STEP 1: Initialize the split array (contains older pending interests)
+                                List<BigDecimal> splitArrayForCalculation = payoutDetail.getSellerInterestOverdueSplit();
+                                if (splitArrayForCalculation == null) {
+                                    splitArrayForCalculation = new java.util.ArrayList<>();
+                                }
+                                
                                 Integer closingDpdForCalculation = payoutDetail.getClosingDpd() != null ? payoutDetail.getClosingDpd() : 0;
                                 
-                                if (sellerInterestOverdue.compareTo(BigDecimal.ZERO) > 0) {
-                                    // Use the split array that was set above (from previous month or loan details, or newly created)
-                                    List<BigDecimal> splitArrayForCalculation = payoutDetail.getSellerInterestOverdueSplit();
-                                    if (splitArrayForCalculation != null && !splitArrayForCalculation.isEmpty()) {
-                                        if (closingDpdForCalculation == 0) {
-                                            // DPD is 0: take all values from array and sum them up
-                                            sellerInterestOverduePaid = splitArrayForCalculation.stream()
-                                                .filter(val -> val != null)
-                                                .reduce(BigDecimal.ZERO, BigDecimal::add);
-                                            
-                                            // Clear the array (remove all values)
-                                            splitArrayForCalculation.clear();
-                                            
-                                            // Add the calculated interest to the array
-                                            splitArrayForCalculation.add(calculatedInterest);
-                                            
-                                            // Update the array back to the payout detail
-                                            payoutDetail.setSellerInterestOverdueSplit(splitArrayForCalculation);
-                                        } else {
-                                            int indexToUse = -1;
-                                            if (closingDpdForCalculation >= 1 && closingDpdForCalculation <= 30) {
-                                                // DPD 1-30: use first value (index 0)
-                                                indexToUse = 0;
-                                            } else if (closingDpdForCalculation >= 31 && closingDpdForCalculation <= 60) {
-                                                // DPD 31-60: use second value (index 1)
-                                                indexToUse = 1;
+                                // STEP 2: Calculate values needed for logic
+                                BigDecimal interestAfterPrincipal = totalInterestComponentPaid.subtract(interestOverduePaid);
+                                
+                                // Calculate plain calculated interest for comparison
+                                BigDecimal plainCalculatedInterest = BigDecimal.ZERO;
+                                if (baseAmount.compareTo(BigDecimal.ZERO) > 0 && daysBetween > 0) {
+                                    Double interestMultiplier = calculateInterestMultiplier(
+                                        interestMethod, 
+                                        payoutDetail.getCycleStartDate(), 
+                                        payoutDetail.getCycleEndDate(),
+                                        daysBetween
+                                    );
+                                    plainCalculatedInterest = baseAmount
+                                        .multiply(BigDecimal.valueOf(annualInterestRate))
+                                        .multiply(BigDecimal.valueOf(interestMultiplier))
+                                        .setScale(2, RoundingMode.HALF_UP);
+                                }
+                                
+                                // Check if normal interest is paid
+                                boolean normalInterestPaid = interestAfterPrincipal.compareTo(new BigDecimal("100")) > 0 && 
+                                                             interestAfterPrincipal.compareTo(plainCalculatedInterest) > 0;
+                                
+                                // STEP 3: Handle interestOverduePaid collection
+                                // If interestOverduePaid is collected, remove that amount from bucket starting from oldest
+                                BigDecimal sellerInterestOverduePaid = BigDecimal.ZERO;
+                                
+                                if (interestOverduePaid.compareTo(BigDecimal.ZERO) > 0 && !splitArrayForCalculation.isEmpty()) {
+                                    // Calculate seller's portion of interestOverduePaid
+                                    BigDecimal sellerInterestOverduePaidToRemove = calculateValue(interestOverduePaid, assignRatio);
+                                    BigDecimal remainingToRemove = sellerInterestOverduePaidToRemove;
+                                    List<BigDecimal> newArray = new java.util.ArrayList<>();
+                                    
+                                    // Remove from array starting from index 0 (oldest) until collected amount is covered
+                                    for (int i = 0; i < splitArrayForCalculation.size(); i++) {
+                                        BigDecimal currentValue = splitArrayForCalculation.get(i);
+                                        
+                                        if (currentValue != null && remainingToRemove.compareTo(BigDecimal.ZERO) > 0) {
+                                            if (currentValue.compareTo(remainingToRemove) <= 0) {
+                                                // Entire value is covered by collection
+                                                // Example: array [1000, 1050, 3000], collected 1700
+                                                // Remove first value (1000) completely
+                                                sellerInterestOverduePaid = sellerInterestOverduePaid.add(currentValue);
+                                                remainingToRemove = remainingToRemove.subtract(currentValue);
+                                                // Don't add to newArray (fully paid)
+                                            } else {
+                                                // Partially covered - split the value
+                                                // Example: array [1000, 1050, 3000], collected 1700
+                                                // After removing 1000, remove 700 from 1050, leaving 350
+                                                sellerInterestOverduePaid = sellerInterestOverduePaid.add(remainingToRemove);
+                                                BigDecimal remainingValue = currentValue.subtract(remainingToRemove);
+                                                newArray.add(remainingValue);
+                                                remainingToRemove = BigDecimal.ZERO;
                                             }
-                                            else if (closingDpdForCalculation >= 61 && closingDpdForCalculation <= 90) {
-                                                // DPD 61-90: use third value (index 2)
-                                                indexToUse = 2;
-                                            }
-                                            
-                                            // If we can use a value from the array, get it and remove it
-                                            if (indexToUse >= 0 && indexToUse < splitArrayForCalculation.size()) {
-                                                // Get the value from the array
-                                                sellerInterestOverduePaid = splitArrayForCalculation.get(indexToUse) != null ? 
-                                                    splitArrayForCalculation.get(indexToUse) : BigDecimal.ZERO;
-                                                
-                                                // Remove the used value from the array
-                                                splitArrayForCalculation.remove(indexToUse);
-                                            }
-                                            
-                                            // Always add the calculated interest to the array (whether we used a value or not)
-                                            splitArrayForCalculation.add(calculatedInterest);
-                                            
-                                            // Update the array back to the payout detail
-                                            payoutDetail.setSellerInterestOverdueSplit(splitArrayForCalculation);
+                                        } else if (currentValue != null) {
+                                            // No more to remove, keep this value
+                                            newArray.add(currentValue);
                                         }
+                                    }
+                                    
+                                    // Update array with remaining values
+                                    splitArrayForCalculation = newArray;
+                                }
+                                
+                                // STEP 4: Handle normal interest paid scenario
+                                // When normal interest is paid, also mark seller overdue interest as paid based on DPD
+                                if (normalInterestPaid && !splitArrayForCalculation.isEmpty()) {
+                                    if (closingDpdForCalculation == 0) {
+                                        // DPD is 0: all overdue interest is paid
+                                        BigDecimal allRemaining = splitArrayForCalculation.stream()
+                                            .filter(val -> val != null)
+                                            .reduce(BigDecimal.ZERO, BigDecimal::add);
+                                        
+                                        sellerInterestOverduePaid = sellerInterestOverduePaid.add(allRemaining);
+                                        splitArrayForCalculation.clear();
                                     } else {
-                                        // Fallback to original logic if split array is not available
-                                        if (totalInterestComponentPaid.compareTo(BigDecimal.ZERO) > 0 && 
-                                            interestOverduePaid.compareTo(BigDecimal.ZERO) > 0 && 
-                                            sellerInterestOverdue.compareTo(interestOverduePaid) < 0) {
-                                            sellerInterestOverduePaid = sellerInterestOverdue;
+                                        // Determine which bucket to use based on DPD
+                                        int indexToUse = -1;
+                                        if (closingDpdForCalculation >= 1 && closingDpdForCalculation <= 30) {
+                                            indexToUse = 0; // DPD 1-30: first value (index 0)
+                                        } else if (closingDpdForCalculation >= 31 && closingDpdForCalculation <= 60) {
+                                            indexToUse = 1; // DPD 31-60: second value (index 1)
+                                        } else if (closingDpdForCalculation >= 61 && closingDpdForCalculation <= 90) {
+                                            indexToUse = 2; // DPD 61-90: third value (index 2)
+                                        }
+                                        
+                                        // Remove the value from the array based on DPD bucket
+                                        if (indexToUse >= 0 && indexToUse < splitArrayForCalculation.size()) {
+                                            BigDecimal valueToRemove = splitArrayForCalculation.get(indexToUse) != null ? 
+                                                splitArrayForCalculation.get(indexToUse) : BigDecimal.ZERO;
+                                            
+                                            sellerInterestOverduePaid = sellerInterestOverduePaid.add(valueToRemove);
+                                            splitArrayForCalculation.remove(indexToUse);
                                         }
                                     }
                                 }
+                                
+                                // STEP 5: Always add current calculated interest to array if DPD > 0
+                                // This represents the current month's interest that will become overdue if not paid
+                                if (closingDpdForCalculation > 0) {
+                                    // Check if calculatedInterest already exists in array (compare by value)
+                                    boolean alreadyExists = splitArrayForCalculation.stream()
+                                        .anyMatch(val -> val != null && val.compareTo(calculatedInterest) == 0);
+                                    
+                                    if (!alreadyExists) {
+                                        splitArrayForCalculation.add(calculatedInterest);
+                                    }
+                                }
+                                
+                                // STEP 6: Update the array back to the payout detail
+                                payoutDetail.setSellerInterestOverdueSplit(splitArrayForCalculation);
                                 payoutDetail.setSellerInterestOverduePaid(sellerInterestOverduePaid);
                                 
-                                // Calculate sellerTotalInterestComponentPaid:
+                                // STEP 7: Calculate closing interest (sellerInterestOverdue)
+                                // Closing interest = sum of all values in array (all pending overdue interests)
+                                BigDecimal closingInterestOverdue = splitArrayForCalculation.stream()
+                                    .filter(val -> val != null)
+                                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                                    .setScale(2, RoundingMode.HALF_UP);
+                                
+                                // Update sellerInterestOverdue with the total from array
+                                payoutDetail.setSellerInterestOverdue(closingInterestOverdue);
+                                
+                                // Recalculate sellerTotalInterestDue with updated sellerInterestOverdue
+                                payoutDetail.setSellerTotalInterestDue(calculatedInterest.add(closingInterestOverdue)
+                                    .setScale(2, RoundingMode.HALF_UP));
+                                
+                                // ====================================================================
+                                // STEP 4: Calculate sellerTotalInterestComponentPaid
+                                // ====================================================================
                                 BigDecimal sellerTotalInterestComponentPaid = BigDecimal.ZERO;
                                 
                                 if (totalInterestComponentPaid.compareTo(BigDecimal.ZERO) > 0) {
-                                    BigDecimal interestAfterPrincipal = totalInterestComponentPaid.subtract(interestOverduePaid);
-
-                                    if (interestAfterPrincipal.compareTo(new BigDecimal("100")) > 0 && 
-                                    interestAfterPrincipal.compareTo(calculatedInterest) > 0) {
-                                        sellerTotalInterestComponentPaid = calculatedInterest.add(sellerInterestOverduePaid)
+                                    if (normalInterestPaid) {
+                                        // Normal interest is paid: calculatedInterest + sellerInterestOverduePaid
+                                        sellerTotalInterestComponentPaid = plainCalculatedInterest.add(sellerInterestOverduePaid)
                                             .setScale(4, RoundingMode.HALF_UP);
-                                    }
-                                    else{
-                                        sellerTotalInterestComponentPaid = (sellerInterestOverduePaid)
-                                                .setScale(4, RoundingMode.HALF_UP);
+                                    } else {
+                                        // Normal interest not paid: only overdue interest paid (if any)
+                                        sellerTotalInterestComponentPaid = sellerInterestOverduePaid
+                                            .setScale(4, RoundingMode.HALF_UP);
                                     }
                                 }
                                 // Log the value before setting
@@ -600,7 +667,7 @@ public class PartnerPayoutDetailsAllService {
                                 payoutDetail.setSellerTotalPaid(totalPaid);
 
                                 logger.debug("Calculated seller fields for payout detail {} with assign ratio: {}, interest rate: {}, days: {}, calculatedInterest: {}, sellerInterestOverdue: {}, sellerTotalInterestDue: {}", 
-                                    payoutDetail.getId(), assignRatio, annualInterestRate, daysBetween, calculatedInterest, sellerInterestOverdue, sellerTotalInterestDue);
+                                    payoutDetail.getId(), assignRatio, annualInterestRate, daysBetween, calculatedInterest, payoutDetail.getSellerInterestOverdue(), payoutDetail.getSellerTotalInterestDue());
                                 
                                 return payoutDetail;
                             });
