@@ -629,29 +629,31 @@ public class PartnerPayoutDetailsAllService {
                                 payoutDetail.setSellerInterestOverdueSplit(splitArrayForCalculation);
                                 payoutDetail.setSellerInterestOverduePaid(sellerInterestOverduePaid);
                                 
-                                // STEP 7: Calculate closing interest (sellerInterestOverdue)
-                                // Closing interest = sum of all values in array (all pending overdue interests)
-                                BigDecimal closingInterestOverdue = splitArrayForCalculation.stream()
-                                    .filter(val -> val != null)
-                                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                                // ====================================================================
+                                // STEP 7: Calculate sellerTotalInterestDue FIRST
+                                // sellerTotalInterestDue = calculatedInterest + opening sellerInterestOverdue
+                                // Opening sellerInterestOverdue comes from previous month calculation
+                                // ====================================================================
+                                // Use the initial sellerInterestOverdue (from previous month) as opening overdue
+                                BigDecimal openingSellerInterestOverdue = sellerInterestOverdue; // This was calculated from previous month
+                                
+                                // Calculate sellerTotalInterestDue = current interest + opening overdue
+                                // Use calculatedInterest (from rate periods or fallback) for consistency
+                                BigDecimal sellerTotalInterestDue = calculatedInterest.add(openingSellerInterestOverdue)
                                     .setScale(2, RoundingMode.HALF_UP);
-                                
-                                // Update sellerInterestOverdue with the total from array
-                                payoutDetail.setSellerInterestOverdue(closingInterestOverdue);
-                                
-                                // Recalculate sellerTotalInterestDue with updated sellerInterestOverdue
-                                payoutDetail.setSellerTotalInterestDue(calculatedInterest.add(closingInterestOverdue)
-                                    .setScale(2, RoundingMode.HALF_UP));
+                                payoutDetail.setSellerTotalInterestDue(sellerTotalInterestDue);
                                 
                                 // ====================================================================
-                                // STEP 4: Calculate sellerTotalInterestComponentPaid
+                                // STEP 8: Calculate sellerTotalInterestComponentPaid
+                                // Must use the same calculatedInterest value as sellerTotalInterestDue for consistency
                                 // ====================================================================
                                 BigDecimal sellerTotalInterestComponentPaid = BigDecimal.ZERO;
                                 
                                 if (totalInterestComponentPaid.compareTo(BigDecimal.ZERO) > 0) {
                                     if (normalInterestPaid) {
                                         // Normal interest is paid: calculatedInterest + sellerInterestOverduePaid
-                                        sellerTotalInterestComponentPaid = plainCalculatedInterest.add(sellerInterestOverduePaid)
+                                        // Use calculatedInterest (not plainCalculatedInterest) to match sellerTotalInterestDue
+                                        sellerTotalInterestComponentPaid = calculatedInterest.add(sellerInterestOverduePaid)
                                             .setScale(4, RoundingMode.HALF_UP);
                                     } else {
                                         // Normal interest not paid: only overdue interest paid (if any)
@@ -659,8 +661,35 @@ public class PartnerPayoutDetailsAllService {
                                             .setScale(4, RoundingMode.HALF_UP);
                                     }
                                 }
-                                // Log the value before setting
                                 payoutDetail.setSellerTotalInterestComponentPaid(sellerTotalInterestComponentPaid);
+                                
+                                // ====================================================================
+                                // STEP 9: Calculate closing interest (sellerInterestOverdue)
+                                // Closing interest = sellerTotalInterestDue - sellerTotalInterestComponentPaid
+                                // This should match the sum of the array after processing
+                                // ====================================================================
+                                BigDecimal closingInterestOverdue = sellerTotalInterestDue.subtract(sellerTotalInterestComponentPaid)
+                                    .setScale(2, RoundingMode.HALF_UP);
+                                
+                                // Ensure non-negative
+                                if (closingInterestOverdue.compareTo(BigDecimal.ZERO) < 0) {
+                                    closingInterestOverdue = BigDecimal.ZERO;
+                                }
+                                
+                                // Update sellerInterestOverdue with the calculated value
+                                payoutDetail.setSellerInterestOverdue(closingInterestOverdue);
+                                
+                                // Verify: The array sum should match closingInterestOverdue (for validation)
+                                BigDecimal arraySum = splitArrayForCalculation.stream()
+                                    .filter(val -> val != null)
+                                    .reduce(BigDecimal.ZERO, BigDecimal::add)
+                                    .setScale(2, RoundingMode.HALF_UP);
+                                
+                                // Log if there's a mismatch (for debugging)
+                                if (arraySum.compareTo(closingInterestOverdue) != 0) {
+                                    logger.warn("Array sum ({}) does not match closingInterestOverdue ({}) for payout detail {}", 
+                                        arraySum, closingInterestOverdue, payoutDetail.getId());
+                                }
 
                                 //Adding Total paid
                                 BigDecimal totalPaid = payoutDetail.getSellerTotalPrincipalComponentPaid().add(payoutDetail.getSellerTotalInterestComponentPaid()).add(payoutDetail.getSellerTotalChargesPaid().add(payoutDetail.getSellerPrepaymentPaid()).add(payoutDetail.getSellerForeclosurePaid()));
