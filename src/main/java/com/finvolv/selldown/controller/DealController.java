@@ -89,11 +89,12 @@ public class DealController {
     // Change interest rate
     @PostMapping("/interest-rate/update")
     public Mono<InterestRateChange> changeInterestRate(@RequestBody InterestRateChange interestRateChange) {
+        Long id = interestRateChange.getId();
         Long dealId = interestRateChange.getDealId();
         Double interestRate = interestRateChange.getInterestRate();
         LocalDate startDate = interestRateChange.getStartDate();
         LocalDate endDate = interestRateChange.getEndDate();
-        return interestRateChangeService.changeInterestRate(dealId, interestRate, startDate, endDate);
+        return interestRateChangeService.changeInterestRate(id, dealId, interestRate, startDate, endDate);
     }
 
 

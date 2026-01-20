@@ -23,7 +23,26 @@ public class InterestRateChangeService {
         return interestRateChangeRepository.findByDealId(dealId);
     }
 
-    public Mono<InterestRateChange> changeInterestRate(Long dealId, Double interestRate, LocalDate startDate, LocalDate endDate) {
+    public Mono<InterestRateChange> changeInterestRate(Long id, Long dealId, Double interestRate, LocalDate startDate, LocalDate endDate) {
+        // If id is provided, update existing entry
+        if (id != null) {
+            return interestRateChangeRepository.findById(id)
+                    .flatMap(existingRate -> {
+                        existingRate.setInterestRate(interestRate);
+                        existingRate.setStartDate(startDate);
+                        existingRate.setEndDate(endDate);
+                        return interestRateChangeRepository.save(existingRate);
+                    })
+                    .flatMap(updatedRate ->
+                            dealRepository.findById(dealId)
+                                    .flatMap(deal -> {
+                                        deal.setAnnualInterestRate(interestRate);
+                                        return dealRepository.save(deal);
+                                    })
+                                    .thenReturn(updatedRate)
+                    );
+        }
+
         // Find the most recent interest rate entry for the deal
         return interestRateChangeRepository.findTopByDealIdOrderByStartDateDesc(dealId)
                 .flatMap(previousRate -> {
