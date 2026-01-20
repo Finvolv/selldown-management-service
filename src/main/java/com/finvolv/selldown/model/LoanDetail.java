@@ -60,6 +60,9 @@ public class LoanDetail {
     @Column("loan_started_date")
     private String loanStartedDate;
     
+    @Column("source")
+    private LoanSource source;
+
     @Builder.Default
     @Column("loan_age")
     private Integer loanAge = 0;
@@ -87,5 +90,10 @@ public class LoanDetail {
         VEHICLE,
         BUSINESS,
         EDUCATION
+    }
+
+    public enum LoanSource {
+        FINCROP,
+        FINRETAIL
     }
 }

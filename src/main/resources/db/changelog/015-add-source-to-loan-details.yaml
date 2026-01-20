@@ -1,0 +1,16 @@
+databaseChangeLog:
+  - changeSet:
+      id: 015-01-add-source-to-loan-details
+      author: system
+      changes:
+        - addColumn:
+            tableName: "sd-loan_details"
+            columns:
+              - column:
+                  name: source
+                  type: VARCHAR(20)
+                  defaultValue: "FINRETAIL"
+                  constraints:
+                    nullable: false
+
+

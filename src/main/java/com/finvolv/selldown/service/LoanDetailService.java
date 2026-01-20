@@ -42,6 +42,7 @@ public class LoanDetailService {
         Integer loanStartedDate,
         Integer loanAge,
         Double currentInterestRate,
+        LoanDetail.LoanSource source,
         java.util.List<java.math.BigDecimal> assignedInterestOverdueSplit
     ) {
         public LoanDetailInputForDeal {
@@ -63,6 +64,7 @@ public class LoanDetailService {
         Integer currentDpd,
         LoanDetail.LoanType loanType,
         String loanStartedDate,
+        LoanDetail.LoanSource source,
         Integer loanAge,
         java.util.List<java.math.BigDecimal> assignedInterestOverdueSplit
     ) {
@@ -84,6 +86,7 @@ public class LoanDetailService {
         LoanDetail.LoanStatus status,
         LoanDetail.LoanType loanType,
         String loanStartedDate,
+        LoanDetail.LoanSource source,
         Integer loanAge
     ) {}
 
@@ -186,6 +189,7 @@ public class LoanDetailService {
             .currentAssignedPOS(calculateAssignedPOS(input.currentPOS(), assignedPercentage))
             .loanStartedDate(input.loanStartedDate() != null ? input.loanStartedDate().toString() : null)
             .loanType(input.loanType())
+            .source(input.source() != null ? input.source() : LoanDetail.LoanSource.FINRETAIL)
             .loanAge(input.loanAge())
             .assignedInterestOverdueSplit(input.assignedInterestOverdueSplit() != null ? input.assignedInterestOverdueSplit() : java.util.Collections.emptyList())
             .createdAt(now)
@@ -238,6 +242,9 @@ public class LoanDetailService {
                 }
                 if (modification.loanStartedDate() != null) {
                     existingLoan.setLoanStartedDate(modification.loanStartedDate());
+                }
+                if (modification.source() != null) {
+                    existingLoan.setSource(modification.source());
                 }
                 if (modification.loanAge() != null) {
                     existingLoan.setLoanAge(modification.loanAge());
@@ -307,6 +314,7 @@ public class LoanDetailService {
             .currentAssignedPOS(calculateAssignedPOS(input.currentPOS(), assignedPercentage))
             .loanType(input.loanType())
             .loanStartedDate(input.loanStartedDate())
+            .source(input.source() != null ? input.source() : LoanDetail.LoanSource.FINRETAIL)
             .loanAge(input.loanAge())
             .assignedInterestOverdueSplit(input.assignedInterestOverdueSplit() != null ? input.assignedInterestOverdueSplit() : java.util.Collections.emptyList())
             .createdAt(LocalDateTime.now())

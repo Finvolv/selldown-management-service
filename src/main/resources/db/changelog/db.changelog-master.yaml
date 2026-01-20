@@ -27,5 +27,7 @@ databaseChangeLog:
       file: classpath:db/changelog/013-add-charges-applicable-to-deal.yaml
   - include:
       file: classpath:db/changelog/014-add-interest-overdue-split-columns.yaml
+  - include:
+      file: classpath:db/changelog/015-add-source-to-loan-details.yaml
 
 

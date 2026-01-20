@@ -57,27 +57,49 @@ public class ExcelExportService {
                 })
                 .defaultIfEmpty(new java.util.AbstractMap.SimpleEntry<>(Double.NaN, false));
 
-        // Fetch loan details to get Customer ROI (currentInterestRate) mapped by lmsLan
-        Mono<Map<String, Double>> customerRoiMapMono = (dealId != null && partnerId != null)
-                ? loanDetailRepository.findByDealIdAndPartnerId(dealId, partnerId)
-                        .collectList()
-                        .map(loanDetails -> {
-                            if (loanDetails != null && !loanDetails.isEmpty()) {
-                                return loanDetails.stream()
-                                        .filter(loan -> loan.getLmsLan() != null && loan.getCurrentInterestRate() != null)
-                                        .collect(Collectors.toMap(
-                                                LoanDetail::getLmsLan,
-                                                LoanDetail::getCurrentInterestRate,
-                                                (existing, replacement) -> existing // Keep first if duplicate
-                                        ));
-                            }
-                            return new LinkedHashMap<String, Double>();
-                        })
-                        .defaultIfEmpty(new LinkedHashMap<>())
-                : Mono.just(new LinkedHashMap<>());
+        // Fetch loan details to get Customer ROI (currentInterestRate) and Source mapped by lmsLan
+        Mono<Map<String, Double>> customerRoiMapMono;
+        Mono<Map<String, String>> sourceMapMono;
+
+        if (dealId != null && partnerId != null) {
+            Mono<List<LoanDetail>> loanDetailsMono = loanDetailRepository.findByDealIdAndPartnerId(dealId, partnerId)
+                    .collectList()
+                    .defaultIfEmpty(List.of());
+
+            customerRoiMapMono = loanDetailsMono.map(loanDetails -> {
+                        if (loanDetails != null && !loanDetails.isEmpty()) {
+                            return loanDetails.stream()
+                                    .filter(loan -> loan.getLmsLan() != null && loan.getCurrentInterestRate() != null)
+                                    .collect(Collectors.toMap(
+                                            LoanDetail::getLmsLan,
+                                            LoanDetail::getCurrentInterestRate,
+                                            (existing, replacement) -> existing // Keep first if duplicate
+                                    ));
+                        }
+                        return new LinkedHashMap<String, Double>();
+                    })
+                    .defaultIfEmpty(new LinkedHashMap<>());
+
+            sourceMapMono = loanDetailsMono.map(loanDetails -> {
+                        if (loanDetails != null && !loanDetails.isEmpty()) {
+                            return loanDetails.stream()
+                                    .filter(loan -> loan.getLmsLan() != null && loan.getSource() != null)
+                                    .collect(Collectors.toMap(
+                                            LoanDetail::getLmsLan,
+                                            loan -> loan.getSource().name(),
+                                            (existing, replacement) -> existing // Keep first if duplicate
+                                    ));
+                        }
+                        return new LinkedHashMap<String, String>();
+                    })
+                    .defaultIfEmpty(new LinkedHashMap<>());
+        } else {
+            customerRoiMapMono = Mono.just(new LinkedHashMap<>());
+            sourceMapMono = Mono.just(new LinkedHashMap<>());
+        }
 
         // Combine all reactive operations and build the Excel file
-        return Mono.zip(dealInfoMono, customerRoiMapMono)
+        return Mono.zip(dealInfoMono, customerRoiMapMono, sourceMapMono)
                 .map(tuple -> {
                     java.util.AbstractMap.SimpleEntry<Double, Boolean> dealInfo = tuple.getT1();
                     Double dealRate = dealInfo.getKey();
@@ -87,11 +109,12 @@ public class ExcelExportService {
                     }
                     Boolean chargesApplicable = dealInfo.getValue();
                     Map<String, Double> customerRoiMap = tuple.getT2();
+                    Map<String, String> sourceMap = tuple.getT3();
                     
                     try (XSSFWorkbook workbook = new XSSFWorkbook(); ByteArrayOutputStream out = new ByteArrayOutputStream()) {
                         Sheet sheet = workbook.createSheet("Partner Payout Report");
 
-                        Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> columns = buildColumns(dealRate, customerRoiMap, chargesApplicable);
+                        Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> columns = buildColumns(dealRate, customerRoiMap, sourceMap, chargesApplicable);
                         
                         // Create cell styles for gray and yellow backgrounds with bold font for header
                         XSSFFont boldFont = workbook.createFont();
@@ -202,7 +225,7 @@ public class ExcelExportService {
                 });
     }
 
-    private Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> buildColumns(Double dealRate, Map<String, Double> customerRoiMap, Boolean chargesApplicable) {
+    private Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> buildColumns(Double dealRate, Map<String, Double> customerRoiMap, Map<String, String> sourceMap, Boolean chargesApplicable) {
         Map<String, java.util.function.Function<PartnerPayoutDetailsAll, Object>> cols = new LinkedHashMap<>();
 
         // Non-seller
@@ -211,6 +234,12 @@ public class ExcelExportService {
         cols.put("Customer ROI", p -> {
             if (p.getLmsLan() != null && customerRoiMap.containsKey(p.getLmsLan())) {
                 return customerRoiMap.get(p.getLmsLan());
+            }
+            return "";
+        });
+        cols.put("Source", p -> {
+            if (p.getLmsLan() != null && sourceMap.containsKey(p.getLmsLan())) {
+                return sourceMap.get(p.getLmsLan());
             }
             return "";
         });
