@@ -6,7 +6,9 @@ import com.finvolv.selldown.model.PartnerPayoutDetailsAll;
 import com.finvolv.selldown.model.SSRSFileDataEntity;
 import com.finvolv.selldown.repository.InterestRateChangeRepository;
 import com.finvolv.selldown.repository.MonthlyLMSStatusRepository;
+import com.finvolv.selldown.repository.MonthlySSRSStatusRepository;
 import com.finvolv.selldown.repository.PartnerPayoutDetailsAllRepository;
+import com.finvolv.selldown.repository.SSRSFileDataRepository;
 import com.finvolv.selldown.service.PartnerPayoutDetailsAllService;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.FillPatternType;
@@ -35,15 +37,19 @@ public class SSRSExcelExportService {
     private final MonthlyLMSStatusRepository monthlyLMSStatusRepository;
     private final PartnerPayoutDetailsAllService partnerPayoutDetailsAllService;
     private final InterestRateChangeRepository interestRateChangeRepository;
+    private final MonthlySSRSStatusRepository monthlySSRSStatusRepository;
+    private final SSRSFileDataRepository ssrsFileDataRepository;
 
     public SSRSExcelExportService(PartnerPayoutDetailsAllRepository partnerPayoutDetailsAllRepository,
-                                 MonthlyLMSStatusRepository monthlyLMSStatusRepository,
-                                 PartnerPayoutDetailsAllService partnerPayoutDetailsAllService,
-                                 InterestRateChangeRepository interestRateChangeRepository) {
+                                  MonthlyLMSStatusRepository monthlyLMSStatusRepository,
+                                  PartnerPayoutDetailsAllService partnerPayoutDetailsAllService,
+                                  InterestRateChangeRepository interestRateChangeRepository, MonthlySSRSStatusRepository monthlySSRSStatusRepository, SSRSFileDataRepository ssrsFileDataRepository) {
         this.partnerPayoutDetailsAllRepository = partnerPayoutDetailsAllRepository;
         this.monthlyLMSStatusRepository = monthlyLMSStatusRepository;
         this.partnerPayoutDetailsAllService = partnerPayoutDetailsAllService;
         this.interestRateChangeRepository = interestRateChangeRepository;
+        this.monthlySSRSStatusRepository = monthlySSRSStatusRepository;
+        this.ssrsFileDataRepository = ssrsFileDataRepository;
     }
 
     public Mono<byte[]> buildSSRSReport(List<SSRSFileDataEntity> ssrsData, Integer year, Integer month, Long dealId) {
@@ -57,6 +63,27 @@ public class SSRSExcelExportService {
             ? interestRateChangeRepository.findByDealId(dealId).collectList()
             : Mono.just(java.util.Collections.<InterestRateChange>emptyList());
         
+        // Calculate previous month and year
+        int previousMonth = month == 1 ? 12 : month - 1;
+        int previousYear = month == 1 ? year - 1 : year;
+        
+        // Fetch previous month's SSRS data
+        Mono<Map<String, SSRSFileDataEntity>> previousMonthSSRSDataMono = 
+            monthlySSRSStatusRepository.findByYearAndMonth(previousYear, previousMonth)
+                .flatMap(previousMonthStatus -> 
+                    ssrsFileDataRepository.findByMonthlySsrsId(previousMonthStatus.getId())
+                        .collectList()
+                        .map(previousSSRSList -> previousSSRSList.stream()
+                            .filter(s -> s.getLmsLan() != null)
+                            .collect(Collectors.toMap(
+                                SSRSFileDataEntity::getLmsLan,
+                                s -> s,
+                                (existing, replacement) -> existing
+                            ))
+                        )
+                )
+                .defaultIfEmpty(java.util.Collections.<String, SSRSFileDataEntity>emptyMap());
+
         return Mono.zip(
             dealMono,
             monthlyLMSStatusRepository.findByYearAndMonth(year, month)
@@ -65,12 +92,14 @@ public class SSRSExcelExportService {
                 )
                 .collectList()
                 .switchIfEmpty(Mono.just(java.util.Collections.<PartnerPayoutDetailsAll>emptyList())),
-            interestRateChangesMono
+            interestRateChangesMono,
+            previousMonthSSRSDataMono
         )
         .map(tuple -> {
             Deal deal = tuple.getT1();
             List<PartnerPayoutDetailsAll> payoutDataList = tuple.getT2();
             List<InterestRateChange> interestRateChanges = tuple.getT3();
+            Map<String, SSRSFileDataEntity> previousMonthSSRSMap = tuple.getT4();
             // Create a map of payout data by lmsLan for quick lookup
             Map<String, PartnerPayoutDetailsAll> payoutMap = payoutDataList.stream()
                 .filter(p -> p.getLmsLan() != null)
@@ -517,7 +546,7 @@ public class SSRSExcelExportService {
                     Cell diffBounceChargesCell = row.createCell(colDiffBounceCharges);
                     String plFtmInstructBounceCharges90Col = getColumnLetter(colPlFtmInstructBounceCharges90);
                     String payoutBounceChargesCol = getColumnLetter(colPayoutBounceCharges);
-                    diffBounceChargesCell.setCellFormula(wrapWithRound(String.format("%s%d-%s%d", 
+                    diffBounceChargesCell.setCellFormula(wrapWithRound(String.format("%s%d+%s%d",
                         plFtmInstructBounceCharges90Col, rowIdx + 1, payoutBounceChargesCol, rowIdx + 1)));
                     diffBounceChargesCell.setCellStyle(yellowDataStyle);
                     
@@ -595,7 +624,7 @@ public class SSRSExcelExportService {
                 sheet.setColumnWidth(colRemarksForeclosureCharges, 5000);
 
                 // Sheet 2: Interest Validations
-                createInterestValidationsSheet(workbook, ssrsData, payoutMap, deal, year, month, interestRateChanges);
+                createInterestValidationsSheet(workbook, ssrsData, payoutMap, deal, year, month, interestRateChanges, previousMonthSSRSMap);
 
                 workbook.write(out);
                 return out.toByteArray();
@@ -767,7 +796,8 @@ public class SSRSExcelExportService {
 
     private void createInterestValidationsSheet(XSSFWorkbook workbook, List<SSRSFileDataEntity> ssrsData, 
                                                 Map<String, PartnerPayoutDetailsAll> payoutMap, Deal deal, 
-                                                Integer year, Integer month, List<InterestRateChange> interestRateChanges) {
+                                                Integer year, Integer month, List<InterestRateChange> interestRateChanges,
+                                                Map<String, SSRSFileDataEntity> previousMonthSSRSMap) {
         Sheet sheet = workbook.createSheet("Interest Validations");
 
         // Create color styles (reuse colors from Sheet1)
@@ -937,6 +967,7 @@ public class SSRSExcelExportService {
             Row row = sheet.createRow(rowIdx);
             row.setHeightInPoints(22);
             PartnerPayoutDetailsAll payout = payoutMap.get(ssrs.getLmsLan());
+            SSRSFileDataEntity previousMonthSSRS = previousMonthSSRSMap.get(ssrs.getLmsLan());
             
             // LAN (green, left-aligned)
             Cell lanCell = row.createCell(colLAN);
@@ -1103,10 +1134,14 @@ public class SSRSExcelExportService {
             remarksClosingIntCell.setCellFormula(String.format("IF(ABS(%s%d)>1,\"Mismatch\",\"\")", diffClosingCol, rowIdx + 1));
             remarksClosingIntCell.setCellStyle(yellowCenterDataStyle);
 
-            // Opening Overdue Int of Previous: References "Opening interest Overdue" column (green)
+            // Opening Overdue Int of Previous: Get from previous month's "Opening interest Overdue"
             Cell openingOverdueIntOfPreviousCell = row.createCell(colOpeningOverdueIntOfPrevious);
-            String openingInterestOverdueCol = getColumnLetter(colOpeningInterestOverdue);
-            openingOverdueIntOfPreviousCell.setCellFormula(wrapWithRound(String.format("%s%d", openingInterestOverdueCol, rowIdx + 1)));
+            if (previousMonthSSRS != null) {
+                Object previousOpeningInterestOverdue = getMetadataValue(previousMonthSSRS, "bsItBeginningInterestReceivable90");
+                setNumericCellValue(openingOverdueIntOfPreviousCell, previousOpeningInterestOverdue);
+            } else {
+                openingOverdueIntOfPreviousCell.setCellFormula("ROUND(0,2)");
+            }
             openingOverdueIntOfPreviousCell.setCellStyle(greenRightDataStyle);
 
             // Overdue Check: (Opening Overdue Int of Previous) - (Overdue Interest collection) (yellow)
