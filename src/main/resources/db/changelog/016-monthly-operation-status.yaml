@@ -1,0 +1,48 @@
+databaseChangeLog:
+  - changeSet:
+      id: 016-create-monthly-operation-status-table
+      author: system
+      changes:
+        - createTable:
+            tableName: "sd-monthly_operation_status"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: year
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: month
+                  type: INT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: status
+                  type: VARCHAR(50)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: cycle_start_date
+                  type: DATE
+              - column:
+                  name: cycle_end_date
+                  type: DATE
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addUniqueConstraint:
+            tableName: "sd-monthly_operation_status"
+            columnNames: year, month
+            constraintName: uk_monthly_operation_status_year_month

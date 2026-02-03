@@ -1,0 +1,53 @@
+databaseChangeLog:
+  - changeSet:
+      id: 017-create-operation-file-data-table
+      author: system
+      changes:
+        - createTable:
+            tableName: "sd-operation_file_data"
+            columns:
+              - column:
+                  name: id
+                  type: BIGINT
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+                    nullable: false
+              - column:
+                  name: monthly_operation_id
+                  type: BIGINT
+                  constraints:
+                    nullable: false
+              - column:
+                  name: lms_lan
+                  type: VARCHAR(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: metadata
+                  type: JSONB
+              - column:
+                  name: created_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+              - column:
+                  name: modified_at
+                  type: TIMESTAMP
+                  defaultValueComputed: CURRENT_TIMESTAMP
+        - addUniqueConstraint:
+            tableName: "sd-operation_file_data"
+            columnNames: monthly_operation_id, lms_lan
+            constraintName: uk_operation_file_data_monthly_op_lan
+        - createIndex:
+            tableName: "sd-operation_file_data"
+            indexName: idx_operation_file_data_monthly_op_id
+            columns:
+              - column:
+                  name: monthly_operation_id
+        - addForeignKeyConstraint:
+            baseTableName: "sd-operation_file_data"
+            baseColumnNames: monthly_operation_id
+            referencedTableName: "sd-monthly_operation_status"
+            referencedColumnNames: id
+            constraintName: fk_operation_file_data_monthly_op_status
+            onDelete: CASCADE

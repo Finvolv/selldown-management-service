@@ -1,6 +1,7 @@
 package com.finvolv.selldown.service;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.client.MultipartBodyBuilder;
@@ -12,6 +13,7 @@ import org.springframework.web.util.UriComponentsBuilder;
 import reactor.core.publisher.Mono;
 import reactor.netty.http.client.HttpClient;
 
+import java.io.File;
 import java.time.Duration;
 import java.util.Map;
 
@@ -103,6 +105,31 @@ public class DocumentUploadService {
             });
     }
 
+    public Mono<String> generateUploadIdForOperation(String authorizationBearerToken,
+                                     String partnerName,
+                                     String dealName,
+                                     Integer year,
+                                     Integer month) {
+        String fileSegment = String.format("operation_output_sd-%s-%d-%d", dealName, month, year);
+        String path = UriComponentsBuilder.fromPath("/loan-management-service/api/v1/document/generate/{partnerName}/{fileSegment}")
+            .buildAndExpand(partnerName, fileSegment)
+            .toUriString();
+
+        return webClient.post()
+            .uri(path)
+            .header(HttpHeaders.AUTHORIZATION, authorizationBearerToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .bodyValue(Map.of(
+                "contextData", Map.of("fileType", "OPERATION_OUTPUT_SD"),
+                "scope", new String[]{"DOWNLOAD", "UPLOAD", "VIEW"},
+                "services", new String[]{"callbackservice"},
+                "singleFileUpload", true
+            ))
+            .retrieve()
+            .bodyToMono(Map.class)
+            .map(response -> (String) response.get("generatedId"));
+    }
+
     public Mono<Void> uploadExcel(String authorizationBearerToken,
                                   String generatedId,
                                   byte[] bytes,
@@ -116,6 +143,31 @@ public class DocumentUploadService {
                 return filename;
             }
         }).contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
+
+        return webClient.post()
+            .uri(path)
+            .header(HttpHeaders.AUTHORIZATION, authorizationBearerToken)
+            .contentType(MediaType.MULTIPART_FORM_DATA)
+            .body(BodyInserters.fromMultipartData(builder.build()))
+            .retrieve()
+            .bodyToMono(Void.class);
+    }
+
+    public Mono<Void> uploadExcelFromFile(String authorizationBearerToken,
+                                          String generatedId,
+                                          String filePath,
+                                          String filename) {
+        String path = String.format("/loan-management-service/api/v1/document/upload/%s", generatedId);
+
+        File file = new File(filePath);
+        if (!file.exists()) {
+            return Mono.error(new RuntimeException("File not found: " + filePath));
+        }
+
+        MultipartBodyBuilder builder = new MultipartBodyBuilder();
+        builder.part("file", new FileSystemResource(file))
+            .filename(filename)
+            .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"));
 
         return webClient.post()
             .uri(path)
