@@ -65,8 +65,7 @@ public class DocumentDownloadService {
         requestBody.put("scope", new String[]{"DOWNLOAD", "UPLOAD", "VIEW"});
         requestBody.put("services", new String[]{"callbackservice"});
         requestBody.put("singleFileUpload", true);
-        log.info("Auth inside document download: {}", authorizationBearerToken);
-//        String authorizationToken = "Bearer " + authorizationBearerToken;
+
         Mono<String> generateIdMono = webClient.post()
             .uri(generatePath)
             .header(HttpHeaders.AUTHORIZATION, authorizationBearerToken)
@@ -104,7 +103,6 @@ public class DocumentDownloadService {
                     log.info("Downloading file from URL...");
                     
                     // Create a separate WebClient for S3 without base URL
-                    // Use URI.create() to preserve the complete signed URL with all query parameters
                     WebClient s3WebClient = WebClient.builder()
                         .codecs(configurer -> configurer.defaultCodecs().maxInMemorySize(50 * 1024 * 1024))
                         .clientConnector(new ReactorClientHttpConnector(
@@ -140,9 +138,7 @@ public class DocumentDownloadService {
         .doOnError(error -> log.error("Error downloading payout file: {}", error.getMessage(), error));
     }
 
-    /**
-     * Download payout file and save to temp location (similar to LoanTrackingService approach)
-     */
+    // Download payout file and save to temp location
     public Mono<String> downloadPayoutFileToTemp(
         String authorizationBearerToken,
         String partnerName,
@@ -179,9 +175,7 @@ public class DocumentDownloadService {
             });
     }
 
-    /**
-     * Cleanup temp file
-     */
+    // Cleanup temp file
     public void cleanupTempFile(String filePath) {
         try {
             File file = new File(filePath);

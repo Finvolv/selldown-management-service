@@ -6,6 +6,7 @@ import com.finvolv.selldown.model.OperationFileDataEntity;
 import com.finvolv.selldown.service.OperationFileService;
 import com.finvolv.selldown.service.DocumentUploadService;
 import com.finvolv.selldown.service.DocumentDownloadService;
+import com.finvolv.selldown.service.OperationExcelExportService;
 import com.finvolv.selldown.service.PartnerPayoutDetailsAllService;
 import com.finvolv.selldown.repository.CustomerRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,7 @@ public class OperationFileController {
     private final OperationFileService operationFileService;
     private final DocumentUploadService documentUploadService;
     private final DocumentDownloadService documentDownloadService;
+    private final OperationExcelExportService operationExcelExportService;
     private final PartnerPayoutDetailsAllService partnerPayoutDetailsAllService;
     private final CustomerRepository customerRepository;
 
@@ -131,7 +133,7 @@ public class OperationFileController {
         @PathVariable Integer month,
         @RequestBody List<Map<String, Object>> selectedPayoutFiles
     ) {
-        logger.info("Authorization Header: {}", authorization);
+
         logger.info("Received Operation Output Excel generation request - dealId: {}, partnerId: {}, year: {}, month: {}, selected payouts: {}", 
             dealId, partnerId, year, month, selectedPayoutFiles != null ? selectedPayoutFiles.size() : 0);
         
@@ -180,36 +182,42 @@ public class OperationFileController {
                     .flatMap(downloadedFilePath -> {
                         logger.info("Downloaded payout file to temp location: {}", downloadedFilePath);
                         
-                        // Step 2: Upload with new name (operation-output-*)
-                        String operationOutputFilename = String.format("operation-output-%s-%s-%d-%s.xlsx", 
-                            dealName, sanitizeForFilename(partnerName), year, monthName);
-                        
-                        logger.info("Uploading as operation output file: {}", operationOutputFilename);
-                        
-                        // Step 3: Upload the file with OPERATION_OUTPUT_SD type
-                        return documentUploadService.generateUploadIdForOperation(
-                                authorization, partnerName, deal.getName(), year, month)
-                            .flatMap(generatedId -> {
-                                logger.info("Generated upload ID for operation output: {}", generatedId);
-                                return documentUploadService.uploadExcelFromFile(
-                                    authorization, 
-                                    generatedId, 
-                                    downloadedFilePath, 
-                                    operationOutputFilename
-                                )
-                                .then(Mono.fromCallable(() -> {
-                                    Map<String, Object> successResponse = new HashMap<>();
-                                    successResponse.put("success", true);
-                                    successResponse.put("generatedId", generatedId);
-                                    successResponse.put("filename", operationOutputFilename);
-                                    successResponse.put("message", "Operation output file uploaded successfully");
-                                    return ResponseEntity.ok(successResponse);
-                                }))
-                                .doFinally(signal -> {
-                                    // Cleanup temp file
-                                    documentDownloadService.cleanupTempFile(downloadedFilePath);
-                                    logger.info("Cleaned up temp file: {}", downloadedFilePath);
-                                });
+                        // Step 2: Process Excel - Add metadata columns from operation_file_data
+                        return operationExcelExportService.processOperationExcel(downloadedFilePath, year, month)
+                            .flatMap(processedFilePath -> {
+                                logger.info("Processed Excel with metadata columns: {}", processedFilePath);
+                                
+                                // Step 3: Upload with new name (operation-output-*)
+                                String operationOutputFilename = String.format("operation-output-%s-%s-%d-%s.xlsx", 
+                                    dealName, sanitizeForFilename(partnerName), year, monthName);
+                                
+                                logger.info("Uploading as operation output file: {}", operationOutputFilename);
+                                
+                                // Step 4: Upload the file with OPERATION_OUTPUT_SD type
+                                return documentUploadService.generateUploadIdForOperation(
+                                        authorization, partnerName, deal.getName(), year, month)
+                                    .flatMap(generatedId -> {
+                                        logger.info("Generated upload ID for operation output: {}", generatedId);
+                                        return documentUploadService.uploadExcelFromFile(
+                                            authorization, 
+                                            generatedId, 
+                                            processedFilePath, 
+                                            operationOutputFilename
+                                        )
+                                        .then(Mono.fromCallable(() -> {
+                                            Map<String, Object> successResponse = new HashMap<>();
+                                            successResponse.put("success", true);
+                                            successResponse.put("generatedId", generatedId);
+                                            successResponse.put("filename", operationOutputFilename);
+                                            successResponse.put("message", "Operation output file uploaded successfully");
+                                            return ResponseEntity.ok(successResponse);
+                                        }))
+                                        .doFinally(signal -> {
+                                            // Cleanup temp file
+                                            documentDownloadService.cleanupTempFile(processedFilePath);
+                                            logger.info("Cleaned up temp file: {}", processedFilePath);
+                                        });
+                                    });
                             });
                     });
                 }))
